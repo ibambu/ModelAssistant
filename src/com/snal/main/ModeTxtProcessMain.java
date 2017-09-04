@@ -63,7 +63,7 @@ public class ModeTxtProcessMain {
         /**
          * 加载元数据
          */
-        Map<String, Table> tableMap = metaDataUtil.loadMetaData(metaDataFile, tenantMap, startsheet, endsheet, mincelltoread);
+       // Map<String, Table> tableMap = metaDataUtil.loadMetaData(metaDataFile, tenantMap, startsheet, endsheet, mincelltoread);
 //        test(tableMap, branches);
         //updateSecurity(tableMap);
 //        makeBranchTablePartition(tableMap, branches);
@@ -74,7 +74,50 @@ public class ModeTxtProcessMain {
         //loadCellCdTableChanged();
         //ttt();
 //        update3monthData();
-        insertSelect(tableMap, branches);
+        //insertSelect(tableMap, branches);
+        trcellinfo(branches);
+    }
+
+    public static void trcellinfo(String[] branches) {
+        String aa = "INSERT INTO REF.TR_CELL_INFO(\n"
+                + "	LOCAL_CD,\n"
+                + "	CELL_CD,\n"
+                + "	CMCC_BRANCH_CD,\n"
+                + "	DISTRICT_CD,\n"
+                + "	DISTRICT_NAM,\n"
+                + "	TOWN_CD,\n"
+                + "	TOWN_NAM,\n"
+                + "	FAINT_CELL_IND,\n"
+                + "	BUSI_OFFICE_CD,\n"
+                + "	BUSI_OFFICE_NAM,\n"
+                + "	REGION_EXT_CD1,\n"
+                + "	REGION_EXT_NAM1,\n"
+                + "	REGION_EXT_CD2,\n"
+                + "	REGION_EXT_NAM2,\n"
+                + "	REGION_EXT_CD3,\n"
+                + "	REGION_EXT_NAM3\n"
+                + ")SELECT \n"
+                + "	LOCAL_CD,\n"
+                + "	REPEAT('0',8-LENGTH(TRIM(CELL_CD)))||UPPER(TRIM(CELL_CD)),\n"
+                + "	CMCC_BRANCH_CD,\n"
+                + "	DISTRICT_CD,\n"
+                + "	DISTRICT_NAM,\n"
+                + "	TOWN_CD,\n"
+                + "	TOWN_NAM,\n"
+                + "	FAINT_CELL_IND,\n"
+                + "	BUSI_OFFICE_CD,\n"
+                + "	BUSI_OFFICE_NAM,\n"
+                + "	REGION_EXT_CD1,\n"
+                + "	REGION_EXT_NAM1,\n"
+                + "	REGION_EXT_CD2,\n"
+                + "	REGION_EXT_NAM2,\n"
+                + "	REGION_EXT_CD3,\n"
+                + "	REGION_EXT_NAM3\n"
+                + "FROM REF.TR_CELL_INFO;\n";
+        for (String branch : branches) {
+            String sql = aa.replaceAll("TR_CELL_INFO", "TR_CELL_INFO_"+branch);
+            System.out.println(sql);
+        }
     }
 
     /**
@@ -143,23 +186,43 @@ public class ModeTxtProcessMain {
         Calendar nowDay = Calendar.getInstance();
         nowDay.setTime(sdfDay.parse("20170821"));
 
-        StringBuilder sqlBuffer = new StringBuilder();
         List partitionCols = Arrays.asList(table.getPartitionCols());
+
+        StringBuilder fieldBuffer = new StringBuilder();
+        for (TableCol tableCol : table.getTablecols()) {
+
+            String colName = tableCol.getColumnName();
+            if (partitionCols.contains(colName)) {
+                continue;
+            }
+            if (colName.endsWith("CELL_CD")) {
+                colName = "LPAD(UPPER(TRIM(" + colName + ")),8,'0')";
+            }
+            fieldBuffer.append(colName).append(",");
+        }
+        fieldBuffer.deleteCharAt(fieldBuffer.length() - 1);//删除最后一个“,”。
+
+        StringBuilder sqlBuffer = new StringBuilder();
         if (partitionCols.contains("month") && partitionCols.contains("day")) {
             while (nowDay.after(oldday)) {
                 String month = sdfMon.format(nowDay.getTime());
                 String day = sdfDay.format(nowDay.getTime());
                 for (String branch : branches) {
                     sqlBuffer.append("perl ~schadm/dssprog/bin/remote_cli.pl bd_b beeline -e \"use jcfw;");
-                    String sql = "INSERT OVERWRITE TABLE TW_PERS_CELL_USR_D_BAK PARTITION(branch='" + branch + "',month=" + month + ",day=" + day + ") "
-                            + "SELECT STAT_DT,CALL_DT,USR_NBR,LOCAL_CD,lpad(trim(upper(CELL_CD)),8,'0'),CMCC_BRANCH_CD,BRND_CD,ROAM_TYP_CD,CALL_CNT,DEBET_MOB_DUR,DEBET_TOLL_DUR,CALL_DUR,ACTVCALL_CNT,ACTVCALL_MOB_DUR,ACTVCALL_CALL_DUR,BYCALL_CNT,BYCALL_MOB_DUR,BYCALL_CALL_DUR,GPRS_UP_FLUX,GPRS_DOWN_FLUX,GPRS_UP_CNT,GPRS_DOWN_CNT,DISC_MOB_FEE,DISC_TOLL_FEE,DISC_INF_FEE,GPRS_FEE,OTHER_FEE "
-                            + "FROM TW_PERS_CELL_USR_D WHERE branch='" + branch + "' AND month=" + month + " AND day=" + day + ";";
-                    sqlBuffer.append(sql);
+                    sqlBuffer.append("INSERT OVERWRITE TABLE JCFW.")
+                            .append(table.getTableName()).append("_BAK ")
+                            .append("PARTITION (branch='").append(branch).append("',")
+                            .append("month=").append(month).append(",")
+                            .append("day=").append(day).append(") ")
+                            .append("SELECT ").append(fieldBuffer.toString())
+                            .append(" FROM JCFW.").append(table.getTableName())
+                            .append(" WHERE branch='").append(branch).append("'")
+                            .append(" AND month=").append(month)
+                            .append(" AND day=").append(day).append(";");
                     sqlBuffer.append("\"\n");
                 }
                 nowDay.add(Calendar.DAY_OF_MONTH, -1);
             }
-
         }
         System.out.println(sqlBuffer.toString());
     }

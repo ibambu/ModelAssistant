@@ -32,5 +32,9 @@ public class NewMainTest {
         }
         System.out.println(Integer.toHexString(213));
     }
+    
+    public static void test(){
+        
+    }
 
 }

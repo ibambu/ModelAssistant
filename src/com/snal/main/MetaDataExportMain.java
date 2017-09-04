@@ -73,24 +73,11 @@ public class MetaDataExportMain {
         String[] headnames2 = {"xmlid", "col_xmlid", "dataname", "col_seq", "colname", "colcnname", "datatype", "length",
             "precision_val", "party_seq", "isprimarykey", "isnullable", "remark", "filed_type_child", "sensitive_level", "policyid"};
 
-//        Workbook wkbook = new SXSSFWorkbook();
-//        Sheet indxsheet = wkbook.createSheet("主模型索引");
-//        Sheet columnsheet = wkbook.createSheet("主模型结构");
-//        ExcelUtil.createTableHeader(headnames1, indxsheet);
-//        ExcelUtil.createTableHeader(headnames2, columnsheet);
-//
-//        Sheet indxsheetBranch = wkbook.createSheet("共享模型索引");
-//        Sheet columnsheetBranch = wkbook.createSheet("共享模型结构");
-//        ExcelUtil.createTableHeader(headnames1, indxsheetBranch);
-//        ExcelUtil.createTableHeader(headnames2, columnsheetBranch);
-//        createExcelData(indxsheet, columnsheet, tables, 1);
-//        createExcelData(indxsheetBranch, columnsheetBranch, tables, 2);
         String impdatasql = makeImportDataSql(tables, headnames1, headnames2);
-//        ExcelUtil.writeLargeDataToExcel(wkbook, outfile);
 
         return impdatasql;
     }
-    
+
     private String makeImportDataSql(List<Table> tables, String[] tableColNames, String[] tableFieldsColNames) {
         StringBuilder sqlbuffer = new StringBuilder();
         int count = 0;
@@ -254,7 +241,7 @@ public class MetaDataExportMain {
             if (table.isShared()) {
                 counttable++;
                 for (String branch : branches) {
-                    if(branch.equalsIgnoreCase("OTH")){
+                    if (branch.equalsIgnoreCase("OTH")) {
                         continue;
                     }
                     Table branchTable = (Table) table.clone();
@@ -327,12 +314,11 @@ public class MetaDataExportMain {
                     }
                     childtables.add(branchTable);
                 }
-            }else{
-                System.out.println("not share:"+table.getTableName());
+            } else {
             }
             maintables.add(table);
         }
-        //maintables.addAll(childtables);
+        maintables.addAll(childtables);
         System.out.println("需拆分主模型数量：" + counttable);
         return maintables;
     }

@@ -36,7 +36,8 @@ public class TableScriptCreator {
         String outputfile = usrdir + "\\" + prop.getProperty("output.file");//脚本输出文件
         String optionValue = prop.getProperty("function.option.value");//脚本类型
         boolean outputSharedTable = Boolean.parseBoolean(prop.getProperty("script.output.share.table"));//是否输出共享模型脚本
-        boolean useproxy = Boolean.parseBoolean(prop.getProperty("script.proxy.program.enabled"));//是否输出共享模型脚本
+        boolean outputMainTable = Boolean.parseBoolean(prop.getProperty("script.output.main.table"));//是否输出共享模型脚本
+        boolean useproxy = Boolean.parseBoolean(prop.getProperty("script.proxy.program.enabled"));//是否输出主模型脚本
         String[] branchList = prop.getProperty("branch.code.value").split(",");//地市简称
         String importpaasfile = usrdir + "\\" + prop.getProperty("script.import.paas.sqlfile");//PAAS导入脚本
         int startsheet = Integer.parseInt(prop.getProperty("start.sheet.index"));

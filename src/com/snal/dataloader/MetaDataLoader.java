@@ -327,7 +327,13 @@ public class MetaDataLoader {
         table.setCreater(tableindx.get(i++));
         table.setCurdutyer(tableindx.get(i++));
         table.setEffDate(tableindx.get(i++));
+        if (table.getEffDate() == null||table.getEffDate().trim().length()==0) {
+            table.setEffDate("2016/10/01");
+        }
         table.setStateDate(tableindx.get(i++));
+        if (table.getStateDate() == null||table.getStateDate().trim().length()==0) {
+            table.setStateDate("2016/10/01");
+        }
         table.setOpenState(tableindx.get(i++));
         table.setRemark(tableindx.get(i++));
         if ("HIVE".equals(table.getDbType())) {
@@ -341,7 +347,7 @@ public class MetaDataLoader {
              * 设置模型其他属性
              */
             TenantAttribute tenantAttr = tenantMap.get(table.getTenantUser());
-            table.setLocation(tenantAttr.getLocation() + "/" + table.getTableModel()+ "/" + table.getTableName());
+            table.setLocation(tenantAttr.getLocation() + "/" + table.getTableModel() + "/" + table.getTableName());
             table.setDbServName(tenantAttr.getDbserver());
             table.setTeamCode(tenantAttr.getTeamcode());
             /**
