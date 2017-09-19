@@ -63,7 +63,7 @@ public class ModeTxtProcessMain {
         /**
          * 加载元数据
          */
-       // Map<String, Table> tableMap = metaDataUtil.loadMetaData(metaDataFile, tenantMap, startsheet, endsheet, mincelltoread);
+         Map<String, Table> tableMap = metaDataUtil.loadMetaData(metaDataFile, tenantMap, startsheet, endsheet, mincelltoread);
 //        test(tableMap, branches);
         //updateSecurity(tableMap);
 //        makeBranchTablePartition(tableMap, branches);
@@ -74,8 +74,8 @@ public class ModeTxtProcessMain {
         //loadCellCdTableChanged();
         //ttt();
 //        update3monthData();
-        //insertSelect(tableMap, branches);
-        trcellinfo(branches);
+        insertSelect(tableMap, branches);
+//        trcellinfo(branches);
     }
 
     public static void trcellinfo(String[] branches) {
@@ -115,7 +115,7 @@ public class ModeTxtProcessMain {
                 + "	REGION_EXT_NAM3\n"
                 + "FROM REF.TR_CELL_INFO;\n";
         for (String branch : branches) {
-            String sql = aa.replaceAll("TR_CELL_INFO", "TR_CELL_INFO_"+branch);
+            String sql = aa.replaceAll("TR_CELL_INFO", "TR_CELL_INFO_" + branch);
             System.out.println(sql);
         }
     }
@@ -227,6 +227,9 @@ public class ModeTxtProcessMain {
         System.out.println(sqlBuffer.toString());
     }
 
+    /**
+     * DB2
+     */
     public static void update3monthData() {
         String targetFile = "C:\\Users\\yx\\Desktop\\融合计费清单改造-小区代码长度改造\\target.txt";
         String exceptFile = "C:\\Users\\yx\\Desktop\\融合计费清单改造-小区代码长度改造\\except.txt";

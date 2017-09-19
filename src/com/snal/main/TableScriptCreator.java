@@ -17,6 +17,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Scanner;
 
 /**
  *
@@ -71,18 +72,30 @@ public class TableScriptCreator {
         /**
          * 检查模型字段是否正确
          */
+        Scanner scanner = new Scanner(System.in);
         for (String tablename : modelist) {
             Table table = tableMap.get(tablename);
             if (table == null) {
                 System.out.println("模型不存在：" + tablename);
                 continue;
             }
-            boolean isok = metaDataUtil.checkTableColumn(table, hivekeywords);
-            if (!isok) {
-                isValid = isValid & isok;
+            if (!optionValue.equals("7")) {
+                if (!table.getStoredFormat().equalsIgnoreCase("PARQUET") && !table.isConstantParam()) {
+                    System.out.println(table.getTableName() + " 存储格式不是PARQUET，可能影响性能，是否继续(Y/N)？");
+                    String optional = scanner.nextLine();
+                    if (!optional.equalsIgnoreCase("Y")) {
+                        isValid = false;
+                        break;
+                    }
+                }
+                boolean isok = metaDataUtil.checkTableColumn(table, hivekeywords);
+                if (!isok) {
+                    isValid = isValid & isok;
+                }
             }
         }
-        if (true) {
+        scanner.close();
+        if (isValid) {
             Map<String, StringBuilder> hqlmap = new HashMap();//存放建表语句，租户相同的模型其建表语句放在一起，便于升级。
             /**
              * 根据function.option.value 调用不同的功能函数。

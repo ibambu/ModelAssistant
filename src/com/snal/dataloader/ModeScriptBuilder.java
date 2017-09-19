@@ -115,7 +115,7 @@ public class ModeScriptBuilder {
                 }
             });
         }
-        System.out.println("输入：" + tablenames.size() + " 输出：" + successtables.size() + " 失败：" + failtables.size());
+        System.out.println("输入（" + tablenames.size() + "）  输出（" + successtables.size() + "）  失败（" + failtables.size() + ")");
         if (!failtables.isEmpty()) {
             System.out.print("处理失败模型：");
             System.out.println(Arrays.toString(failtables.toArray()));
@@ -165,7 +165,7 @@ public class ModeScriptBuilder {
                 }
             });
         }
-        System.out.println("输入：" + tablenames.size() + " 输出：" + successtables.size() + " 失败：" + failtables.size());
+        System.out.println("输入（" + tablenames.size() + "）  输出（" + successtables.size() + "）  失败（" + failtables.size() + ")");
         if (!failtables.isEmpty()) {
             System.out.print("处理失败模型：");
             System.out.println(Arrays.toString(failtables.toArray()));
@@ -197,17 +197,17 @@ public class ModeScriptBuilder {
         sqlbuffer.append(tableproperties);//表属性语句
 
         if (table.isConstantParam()) {
-            sqlbuffer.append("ALTER TABLE JCFW.").append(table.getTableName()).append(" ADD PARTITION (branch='GMCC');");
+            sqlbuffer.append("\nALTER TABLE JCFW.").append(table.getTableName()).append(" ADD PARTITION (branch='GMCC');\n");
         }
         if (isUseProxy) {
             sqlbuffer.append("\"");
         }
         sqlbuffer.append("\n");
         if (tablecols != null && tablecols.length() > 0 && tableproperties != null && tableproperties.length() > 0) {
-            System.out.println("[OK][Main Table]" + table.getTableName());
+            System.out.println("[OK] " + table.getTableName() + " [" + table.getTenantUser() + "]");
             successtables.add(table.getTableName());
         } else {
-            System.out.println("[Fail]" + table.getTableName());
+            System.out.println("[Fail] " + table.getTableName());
             failtables.add(table.getTableName());
         }
         /**
@@ -274,15 +274,15 @@ public class ModeScriptBuilder {
                 sqlbuff.append("\"");
             }
             sqlbuff.append("\n");
-            List parititons = Arrays.asList(table.getPartitionCols());
-            if (parititons.contains("month") || parititons.contains("day")) {
-                sqlbuff.append("MSCK REPAIR TABLE ").append(branchTable.getDbName()).append(".").append(branchTable.getTableName()).append(";\n\n");
-            }
+//            List parititons = Arrays.asList(table.getPartitionCols());
+//            if (parititons.contains("month") || parititons.contains("day")) {
+//                sqlbuff.append("MSCK REPAIR TABLE ").append(branchTable.getDbName()).append(".").append(branchTable.getTableName()).append(";\n\n");
+//            }
             if (tablecols != null && tablecols.length() > 0 && tablepropertes != null && tablepropertes.length() > 0) {
-                System.out.println("[OK][Shared Table]" + branchTable.getTableName());
+                System.out.println("[OK] " + branchTable.getTableName() + " [" + branchTable.getTenantUser() + "]");
                 successtables.add(branchTable.getTableName());
             } else {
-                System.out.println("[Fail]" + branchTable.getTableName());
+                System.out.println("[Fail] " + branchTable.getTableName());
                 failtables.add(branchTable.getTableName());
             }
         }
@@ -711,7 +711,7 @@ public class ModeScriptBuilder {
                 for (String branch : branches) {
                     String branchTable = table.getTableName();
                     String alterTabelStr = "ALTER TABLE JCFW." + branchTable + " ADD PARTITION (";
-                    String pStr = "branch='"+branch+"',month=" + sdfMon.format(nowDay.getTime()) + ",day=" + sdfDay.format(nowDay.getTime());
+                    String pStr = "branch='" + branch + "',month=" + sdfMon.format(nowDay.getTime()) + ",day=" + sdfDay.format(nowDay.getTime());
                     sqlbuffer.append(alterTabelStr).append(pStr).append(");");
                 }
                 sqlbuffer.append("\"\n");
@@ -859,7 +859,7 @@ public class ModeScriptBuilder {
                 sqlbuffer.append("perl ~schadm/dssprog/bin/remote_cli.pl bd_b beeline -e \"USE JCFW;");
                 for (String branch : branches) {
                     String alterTabelStr = "ALTER TABLE JCFW." + table.getTableName() + " ADD PARTITION (";
-                    String pStr = "branch='"+branch+"', month=" + sdfMon.format(nowDay.getTime()) + ",day=" + sdfDay.format(nowDay.getTime());
+                    String pStr = "branch='" + branch + "', month=" + sdfMon.format(nowDay.getTime()) + ",day=" + sdfDay.format(nowDay.getTime());
                     sqlbuffer.append(alterTabelStr).append(pStr).append(");");
                 }
                 sqlbuffer.append("\"\n");
@@ -981,7 +981,7 @@ public class ModeScriptBuilder {
                 hqlbuffer.append(hqlstr);
             });
         }
-        System.out.println("输入：" + tablenames.size() + " 输出：" + successtables.size() + " 失败：" + failtables.size());
+        System.out.println("输入（" + tablenames.size() + " ） 输出（" + successtables.size() + "）  失败（" + failtables.size()+"）");
         if (!failtables.isEmpty()) {
             System.out.print("处理失败模型：");
             System.out.println(Arrays.toString(failtables.toArray()));
