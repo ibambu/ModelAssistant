@@ -54,7 +54,9 @@ public class ModeTxtProcessMain {
         Properties prop = PropertiesFileLoader.loadConfData();
         Map<String, TenantAttribute> tenantMap = PropertiesFileLoader.initTenantAttribute(prop);
         String metaDataFile = prop.getProperty("hive.meta.data.file");//元数据文件路径
-
+        String usrdir = System.getProperty("user.dir");
+        String inputfile = usrdir + "\\" + prop.getProperty("input.file");//要处理的模型列表文件
+        String outputfile = usrdir + "\\" + prop.getProperty("output.file");//脚本输出文件
         int startsheet = Integer.parseInt(prop.getProperty("start.sheet.index"));
         int endsheet = Integer.parseInt(prop.getProperty("end.sheet.index"));
         String[] sheetmincell = prop.getProperty("sheet.min.cell.load").split(",");
@@ -63,7 +65,7 @@ public class ModeTxtProcessMain {
         /**
          * 加载元数据
          */
-         Map<String, Table> tableMap = metaDataUtil.loadMetaData(metaDataFile, tenantMap, startsheet, endsheet, mincelltoread);
+        Map<String, Table> tableMap = metaDataUtil.loadMetaData(metaDataFile, tenantMap, startsheet, endsheet, mincelltoread);
 //        test(tableMap, branches);
         //updateSecurity(tableMap);
 //        makeBranchTablePartition(tableMap, branches);
@@ -74,7 +76,22 @@ public class ModeTxtProcessMain {
         //loadCellCdTableChanged();
         //ttt();
 //        update3monthData();
-        insertSelect(tableMap, branches);
+        String startDay = "20170801";
+        String endDay = "20170831";
+        List<String> gmccTables = new ArrayList();
+        gmccTables.add("TW_SHL_AREA_USE_DTL_MO");
+        gmccTables.add("TO_DNO_GPRS_CDR");
+        gmccTables.add("TO_INTL_VOICE_VSTD_ROAM_DAY");
+        gmccTables.add("TR_CELL");
+        gmccTables.add("TR_CELL_TYP");
+        List<String> tableNames = TextUtil.readTxtFileToList(inputfile, true);
+        for (String tableName : tableNames) {
+            if (gmccTables.contains(tableName)) {
+                insertSelect(tableName, tableMap, new String[]{"GMCC"}, startDay, endDay);
+            } else {
+                insertSelect(tableName, tableMap, branches, startDay, endDay);
+            }
+        }
 //        trcellinfo(branches);
     }
 
@@ -174,17 +191,20 @@ public class ModeTxtProcessMain {
         return realTableName;
     }
 
-    public static void insertSelect(Map<String, Table> tableMap, String[] branches) throws ParseException {
+    public static void insertSelect(String tableName, Map<String, Table> tableMap, String[] branches, String sDay, String eDay) throws ParseException, IOException {
 
-        Table table = tableMap.get("TW_PERS_CELL_USR_D");
-        SimpleDateFormat sdfDay = new SimpleDateFormat("yyyyMMdd");
-        SimpleDateFormat sdfMon = new SimpleDateFormat("yyyyMM");
+        Table table = tableMap.get(tableName);
+        SimpleDateFormat formatDay = new SimpleDateFormat("yyyyMMdd");
+        SimpleDateFormat formatMon = new SimpleDateFormat("yyyyMM");
 
-        Calendar oldday = Calendar.getInstance();
-        oldday.setTime(sdfDay.parse("20170820"));
+        Calendar startDay = Calendar.getInstance();
+        startDay.setTime(formatDay.parse(sDay));
 
-        Calendar nowDay = Calendar.getInstance();
-        nowDay.setTime(sdfDay.parse("20170821"));
+        Calendar endDay = Calendar.getInstance();
+        endDay.setTime(formatDay.parse(eDay));
+
+        Calendar endMon = Calendar.getInstance();
+        endMon.setTime(formatDay.parse(eDay));
 
         List partitionCols = Arrays.asList(table.getPartitionCols());
 
@@ -204,11 +224,11 @@ public class ModeTxtProcessMain {
 
         StringBuilder sqlBuffer = new StringBuilder();
         if (partitionCols.contains("month") && partitionCols.contains("day")) {
-            while (nowDay.after(oldday)) {
-                String month = sdfMon.format(nowDay.getTime());
-                String day = sdfDay.format(nowDay.getTime());
+            while (startDay.before(endDay) || startDay.equals(endDay)) {
+                String month = formatMon.format(startDay.getTime());
+                String day = formatDay.format(startDay.getTime());
                 for (String branch : branches) {
-                    sqlBuffer.append("perl ~schadm/dssprog/bin/remote_cli.pl bd_b beeline -e \"use jcfw;");
+                    sqlBuffer.append("perl ~schadm/dssprog/bin/remote_cli.pl ").append(table.getTenantUser()).append(" beeline -e \"use jcfw;");
                     sqlBuffer.append("INSERT OVERWRITE TABLE JCFW.")
                             .append(table.getTableName()).append("_BAK ")
                             .append("PARTITION (branch='").append(branch).append("',")
@@ -221,10 +241,40 @@ public class ModeTxtProcessMain {
                             .append(" AND day=").append(day).append(";");
                     sqlBuffer.append("\"\n");
                 }
-                nowDay.add(Calendar.DAY_OF_MONTH, -1);
+                startDay.add(Calendar.DAY_OF_MONTH, 1);
+            }
+        } else if (partitionCols.contains("month") && !partitionCols.contains("day")) {
+            while (endMon.after(startDay) || endMon.equals(startDay)) {
+                String month = formatMon.format(endMon.getTime());
+                for (String branch : branches) {
+                    sqlBuffer.append("perl ~schadm/dssprog/bin/remote_cli.pl ").append(table.getTenantUser()).append(" beeline -e \"use jcfw;");
+                    sqlBuffer.append("INSERT OVERWRITE TABLE JCFW.")
+                            .append(table.getTableName()).append("_BAK ")
+                            .append("PARTITION (branch='").append(branch).append("',")
+                            .append("month=").append(month).append(")")
+                            .append("SELECT ").append(fieldBuffer.toString())
+                            .append(" FROM JCFW.").append(table.getTableName())
+                            .append(" WHERE branch='").append(branch).append("'")
+                            .append(" AND month=").append(month).append(";");
+                    sqlBuffer.append("\"\n");
+                }
+                endMon.add(Calendar.MONTH, -1);
+            }
+        } else if (partitionCols.contains("branch")
+                && !partitionCols.contains("month")
+                && !partitionCols.contains("day")) {
+            for (String branch : branches) {
+                sqlBuffer.append("perl ~schadm/dssprog/bin/remote_cli.pl ").append(table.getTenantUser()).append(" beeline -e \"use jcfw;");
+                sqlBuffer.append("INSERT OVERWRITE TABLE JCFW.")
+                        .append(table.getTableName()).append("_BAK ")
+                        .append("PARTITION (branch='").append(branch).append("')")
+                        .append("SELECT ").append(fieldBuffer.toString())
+                        .append(" FROM JCFW.").append(table.getTableName())
+                        .append(" WHERE branch='").append(branch).append("';");
+                sqlBuffer.append("\"\n");
             }
         }
-        System.out.println(sqlBuffer.toString());
+        TextUtil.writeToFile(sqlBuffer.toString(), tableName + ".sh");
     }
 
     /**
