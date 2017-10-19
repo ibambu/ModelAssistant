@@ -51,7 +51,7 @@ public class TableScriptCreator {
          * 检查模型名称是否有空格或者空行
          */
         boolean isValid = true;
-        if (!optionValue.equals("5")) {
+        if (!optionValue.equals("5") ) {
             for (String tablename : modelist) {
                 if (tablename.contains(" ") || tablename.trim().length() == 0) {
                     System.out.println("[" + tablename + "] 模型名前后不能包含空格或者是空行！");
@@ -79,7 +79,7 @@ public class TableScriptCreator {
                 System.out.println("模型不存在：" + tablename);
                 continue;
             }
-            if (!optionValue.equals("7")) {
+            if (!optionValue.equals("7")&& !optionValue.equals("12") && !optionValue.equals("4")) {
                 if (!table.getStoredFormat().equalsIgnoreCase("PARQUET") && !table.isConstantParam()) {
                     System.out.println(table.getTableName() + " 存储格式不是PARQUET，可能影响性能，是否继续(Y/N)？");
                     String optional = scanner.nextLine();
@@ -145,6 +145,10 @@ public class TableScriptCreator {
                     break;
                 case "11":
                     hqlmap = ModeScriptBuilder.changeColumnDelimiter(modelist, tableMap, "20161001", "20161130", branchList, false);
+                    ModeScriptBuilder.writeToFile(hqlmap, outputfile);
+                    break;
+                case "12":
+                    hqlmap = ModeScriptBuilder.changeExtendFlag(modelist, tableMap, "20161001", "20161130", branchList, false);
                     ModeScriptBuilder.writeToFile(hqlmap, outputfile);
                     break;
                 default:

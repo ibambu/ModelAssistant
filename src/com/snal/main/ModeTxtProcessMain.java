@@ -20,7 +20,6 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
-import java.math.BigDecimal;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -29,9 +28,11 @@ import java.util.Calendar;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.stream.Stream;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
@@ -52,20 +53,21 @@ public class ModeTxtProcessMain {
     public static void main(String[] args) throws Exception {
         MetaDataLoader metaDataUtil = new MetaDataLoader();
         Properties prop = PropertiesFileLoader.loadConfData();
+
         Map<String, TenantAttribute> tenantMap = PropertiesFileLoader.initTenantAttribute(prop);
-        String metaDataFile = prop.getProperty("hive.meta.data.file");//元数据文件路径
+        String metaDataFile = prop.getProperty("hive.meta.data.file");//Ԫ�����ļ�·��
         String usrdir = System.getProperty("user.dir");
-        String inputfile = usrdir + "\\" + prop.getProperty("input.file");//要处理的模型列表文件
-        String outputfile = usrdir + "\\" + prop.getProperty("output.file");//脚本输出文件
+        String inputfile = usrdir + "\\" + prop.getProperty("input.file");//Ҫ�����ģ���б��ļ�
+        String outputfile = usrdir + "\\" + prop.getProperty("output.file");//�ű�����ļ�
         int startsheet = Integer.parseInt(prop.getProperty("start.sheet.index"));
         int endsheet = Integer.parseInt(prop.getProperty("end.sheet.index"));
         String[] sheetmincell = prop.getProperty("sheet.min.cell.load").split(",");
         String[] branches = prop.getProperty("branch.code.value").split(",");
         int[] mincelltoread = {Integer.parseInt(sheetmincell[0]), Integer.parseInt(sheetmincell[1])};
         /**
-         * 加载元数据
+         * ����Ԫ����
          */
-        Map<String, Table> tableMap = metaDataUtil.loadMetaData(metaDataFile, tenantMap, startsheet, endsheet, mincelltoread);
+//        Map<String, Table> tableMap = metaDataUtil.loadMetaData(metaDataFile, tenantMap, startsheet, endsheet, mincelltoread);
 //        test(tableMap, branches);
         //updateSecurity(tableMap);
 //        makeBranchTablePartition(tableMap, branches);
@@ -76,23 +78,67 @@ public class ModeTxtProcessMain {
         //loadCellCdTableChanged();
         //ttt();
 //        update3monthData();
-        String startDay = "20170801";
-        String endDay = "20170831";
-        List<String> gmccTables = new ArrayList();
-        gmccTables.add("TW_SHL_AREA_USE_DTL_MO");
-        gmccTables.add("TO_DNO_GPRS_CDR");
-        gmccTables.add("TO_INTL_VOICE_VSTD_ROAM_DAY");
-        gmccTables.add("TR_CELL");
-        gmccTables.add("TR_CELL_TYP");
+//        String startDay = "20170701";
+//        String endDay = "20170731";
+//        List<String> gmccTables = new ArrayList();
+//        gmccTables.add("TW_SHL_AREA_USE_DTL_MO");
+//        gmccTables.add("TO_DNO_GPRS_CDR");
+//        gmccTables.add("TO_INTL_VOICE_VSTD_ROAM_DAY");
+//        gmccTables.add("TR_CELL");
+//        gmccTables.add("TR_CELL_TYP");
         List<String> tableNames = TextUtil.readTxtFileToList(inputfile, true);
-        for (String tableName : tableNames) {
-            if (gmccTables.contains(tableName)) {
-                insertSelect(tableName, tableMap, new String[]{"GMCC"}, startDay, endDay);
-            } else {
-                insertSelect(tableName, tableMap, branches, startDay, endDay);
+//        for(String tableName:tableNames){
+//            Table table = tableMap.get(tableName);
+//            System.out.println(tableName+":"+(table.getTablecols().size()-4));
+//        }
+//        for (String tableName : tableNames) {
+//            if (gmccTables.contains(tableName)) {
+//                insertSelect(tableName, tableMap, new String[]{"GMCC"}, startDay, endDay);
+//            } else {
+//                insertSelect(tableName, tableMap, branches, startDay, endDay);
+//            }
+//        }
+//        trcellinfo(branches);
+        cdrtest(branches);
+//        reAddPartitions(tableNames, branches);
+    }
+
+    public static void hebing() {
+        String proxy = "perl ~schadm/dssprog/bin/remote_cli.pl bd_day ";
+        List<String> dirs = TextUtil.readTxtFileToList("e:/dirs.txt", false);
+        for (String dir : dirs) {
+            if (dir != null && dir.trim().length() > 0) {
+                int idx = dir.indexOf("branch=");
+                String path = dir.substring(0, idx);
+                int idx1 = dir.lastIndexOf("/");
+                String filename = dir.substring(idx1 + 1, dir.length());
+                String branch = dir.substring(idx1 - 2, idx1);
+                String cmd = proxy + " hadoop fs -mv " + dir + " " + path + "branch=GMCC/" + branch + filename;
+                System.out.println(cmd);
             }
         }
-//        trcellinfo(branches);
+    }
+    public static void countColums(){
+        
+    }
+    public static void cdrtest(String[] branches) throws IOException {
+        StringBuilder buffer = new StringBuilder();
+        String path ="E:\\i-work\\SVN\\GDBI\\02GDBI代码\\01 主体仓库\\04PERL代码\\PERL脚本\\融合计费清单视图脚本\\";
+        List<String> alist = TextUtil.readTxtFileToList(path+"GPRS_CDR_VIEW.pl", false);
+        for (String a : alist) {
+            int idx = a.indexOf("--");
+            if (idx != -1) {
+                a = a.substring(0, idx);
+            }
+            buffer.append(a).append("\n");
+        }
+        System.out.println(buffer.toString());
+//        for (String branch : branches) {
+//            String sql = buffer.toString();
+//            sql = sql.replaceAll("GZ20170926", branch + "20170926");
+//            System.out.println(sql);
+//        }
+//        TextUtil.writeToFile(buffer.toString(), "E:\\i-work\\SVN\\GDBI\\02GDBI����\\01 ����ֿ�\\04PERL����\\PERL�ű�\\�ںϼƷ��嵥��ͼ�ű�\\test.pl");
     }
 
     public static void trcellinfo(String[] branches) {
@@ -137,8 +183,17 @@ public class ModeTxtProcessMain {
         }
     }
 
+    public static void reAddPartitions(List<String> tableNames, String[] branches) {
+        for (String tableName : tableNames) {
+            for (String branche : branches) {
+                String sql = "MSCK REPAIR TABLE JCFW." + tableName + "_" + branche + ";";
+                System.out.println(sql);
+            }
+        }
+    }
+
     /**
-     * 扩展字段长度
+     * ��չ�ֶγ���
      *
      * @param tableName
      * @param columnName
@@ -150,7 +205,7 @@ public class ModeTxtProcessMain {
     }
 
     /**
-     * 字段左补0足8位长度。
+     * �ֶ���0��8λ���ȡ�
      *
      * @param tableName
      * @param columnName
@@ -163,7 +218,7 @@ public class ModeTxtProcessMain {
     }
 
     /**
-     * 从模型实例名中提取真正的模型名
+     * ��ģ��ʵ��������ȡ������ģ����
      *
      * @param tableName
      * @return
@@ -194,6 +249,8 @@ public class ModeTxtProcessMain {
     public static void insertSelect(String tableName, Map<String, Table> tableMap, String[] branches, String sDay, String eDay) throws ParseException, IOException {
 
         Table table = tableMap.get(tableName);
+        Optional<Table> table1 = Optional.of(table);
+        table1.map(t->t.getTableName());
         SimpleDateFormat formatDay = new SimpleDateFormat("yyyyMMdd");
         SimpleDateFormat formatMon = new SimpleDateFormat("yyyyMM");
 
@@ -220,7 +277,7 @@ public class ModeTxtProcessMain {
             }
             fieldBuffer.append(colName).append(",");
         }
-        fieldBuffer.deleteCharAt(fieldBuffer.length() - 1);//删除最后一个“,”。
+        fieldBuffer.deleteCharAt(fieldBuffer.length() - 1);//ɾ�����һ����,����
 
         StringBuilder sqlBuffer = new StringBuilder();
         if (partitionCols.contains("month") && partitionCols.contains("day")) {
@@ -281,15 +338,15 @@ public class ModeTxtProcessMain {
      * DB2
      */
     public static void update3monthData() {
-        String targetFile = "C:\\Users\\yx\\Desktop\\融合计费清单改造-小区代码长度改造\\target.txt";
-        String exceptFile = "C:\\Users\\yx\\Desktop\\融合计费清单改造-小区代码长度改造\\except.txt";
-        String columnFile = "C:\\Users\\yx\\Desktop\\融合计费清单改造-小区代码长度改造\\模型字段对应关系.txt";
+        String targetFile = "C:\\Users\\yx\\Desktop\\�ںϼƷ��嵥����-С�����볤�ȸ���\\target.txt";
+        String exceptFile = "C:\\Users\\yx\\Desktop\\�ںϼƷ��嵥����-С�����볤�ȸ���\\except.txt";
+        String columnFile = "C:\\Users\\yx\\Desktop\\�ںϼƷ��嵥����-С�����볤�ȸ���\\ģ���ֶζ�Ӧ��ϵ.txt";
         List<String> targetTables = TextUtil.readTxtFileToList(targetFile, false);
         List<String> modifyColumns = TextUtil.readTxtFileToList(columnFile, false);
         List<String> exceptTables = TextUtil.readTxtFileToList(exceptFile, false);
-        StringBuilder buffer0 = new StringBuilder();//修改表结构
-        StringBuilder buffer1 = new StringBuilder();//修改月表数据
-        StringBuilder buffer2 = new StringBuilder();//修改不分表数据
+        StringBuilder buffer0 = new StringBuilder();//�޸ı�ṹ
+        StringBuilder buffer1 = new StringBuilder();//�޸��±�����
+        StringBuilder buffer2 = new StringBuilder();//�޸Ĳ��ֱ�����
         targetTables.forEach((targetTable) -> {
             modifyColumns.stream().map((mocifyColumn) -> mocifyColumn.split(",")).forEachOrdered((tableAndCol) -> {
                 String columnName = tableAndCol[1];
@@ -298,18 +355,18 @@ public class ModeTxtProcessMain {
                     if (targetTable.contains("2017")) {
                         String targetTable1 = targetTable.replaceAll("201708", "201706");
                         /**
-                         * 修改对应月份表的小区代码字段，扩展到8位长度。
+                         * �޸Ķ�Ӧ�·ݱ��С�������ֶΣ���չ��8λ���ȡ�
                          */
                         String chgsql1 = extendColumnLength(targetTable1, columnName);
                         buffer0.append(chgsql1);
                         /**
-                         * 修改对应月表的小区代码数据，左补0足8位长度。
+                         * �޸Ķ�Ӧ�±��С���������ݣ���0��8λ���ȡ�
                          */
                         String chgValueSql1 = updateColumnValue(targetTable1, columnName);
                         buffer1.append(chgValueSql1);
                     } else {
                         /**
-                         * 不分表的表直接修改小区代码数据，左补0足8位长度。
+                         * ���ֱ�ı�ֱ���޸�С���������ݣ���0��8λ���ȡ�
                          */
                         String chgValueSql = updateColumnValue(targetTable, columnName);
                         buffer2.append(chgValueSql);
@@ -323,7 +380,7 @@ public class ModeTxtProcessMain {
     }
 
     public static void loadCellCdTableChanged() {
-        String logfile = "C:\\Users\\yx\\Desktop\\融合计费清单改造-小区代码长度改造\\提取升级模型.txt";
+        String logfile = "C:\\Users\\yx\\Desktop\\�ںϼƷ��嵥����-С�����볤�ȸ���\\��ȡ����ģ��.txt";
         List<String> loglines = TextUtil.readTxtFileToList(logfile, false);
         for (String line : loglines) {
             if (line.contains("SET DATA TYPE")) {
@@ -362,7 +419,7 @@ public class ModeTxtProcessMain {
         String filename = "C:\\Users\\yx\\Desktop\\cdrtable.log";
         List<String> alist = TextUtil.readTxtFileToList(filename, false);
         Workbook wkbook = new SXSSFWorkbook();
-        Sheet sheet = wkbook.createSheet("融合计费清单表结构");
+        Sheet sheet = wkbook.createSheet("�ںϼƷ��嵥��ṹ");
         int rowcount = 0;
         String tablename = "";
         int colseq = 1;
@@ -425,7 +482,7 @@ public class ModeTxtProcessMain {
                 boolean isAdded = false;
                 while ((readline = bufreader.readLine()) != null) {
 //                    if (!isAdded && readline.contains("Current Version")) {
-//                        String element = "--  2017-6-27   根据固定需求_R201704210015001_长市漫一体化（取消长途、漫游费）业务支撑系统改造修改存储过程";
+//                        String element = "--  2017-6-27   ���ݹ̶�����_R201704210015001_������һ�廯��ȡ����;�����ηѣ�ҵ��֧��ϵͳ�����޸Ĵ洢����";
 //                        String preline = datalist.get(datalist.size() - 1);
 //                        String prelinestr = "---------------------------------------------------------------";
 //                        if (!preline.contains(prelinestr)) {
@@ -436,8 +493,8 @@ public class ModeTxtProcessMain {
 //                    }
 //                    datalist.add(readline);
                     String regx = "################################################################";
-                    if (!isAdded && readline.contains(regx) && !readline.contains("说明")) {
-                        String element = "# 2017-07-7   根据固定需求_R201704210015001_长市漫一体化（取消长途、漫游费）业务支撑系统改造修改存储过程";
+                    if (!isAdded && readline.contains(regx) && !readline.contains("˵��")) {
+                        String element = "# 2017-07-7   ���ݹ̶�����_R201704210015001_������һ�廯��ȡ����;�����ηѣ�ҵ��֧��ϵͳ�����޸Ĵ洢����";
                         datalist.add(element);
                         isAdded = true;
                     }
@@ -457,7 +514,7 @@ public class ModeTxtProcessMain {
     }
 
     public static void insertVersionLog() throws Exception {
-        String baseDir = "F:\\work\\代码_SR201704210015001_长市漫一体化（取消长途、漫游费）业务支撑系统改造\\";
+        String baseDir = "F:\\work\\����_SR201704210015001_������һ�廯��ȡ����;�����ηѣ�ҵ��֧��ϵͳ����\\";
 //        String dir1 = baseDir + "SR201704210015001\\SSBPT\\PROC_PERL";
         String dir1 = baseDir + "SR201704210015001\\DSS\\PROC_PERL";
 //        String outpath = baseDir + "SR201704210015001_new\\SSBPT\\PROC_PERL\\";
@@ -472,7 +529,7 @@ public class ModeTxtProcessMain {
     public static void test222() throws IOException {
         String outpath = "F:\\data\\";
 
-        List<String> datalist = TextUtil.readTxtFileToList("C:\\Users\\yx\\Desktop\\全省 - 副本.txt", false);
+        List<String> datalist = TextUtil.readTxtFileToList("C:\\Users\\yx\\Desktop\\ȫʡ - ����.txt", false);
         int count = 0;
         int dataRows = datalist.size();
         int maxLine = dataRows / 20;
@@ -482,29 +539,29 @@ public class ModeTxtProcessMain {
         BufferedWriter bufwriter = new BufferedWriter(writerStream);
         for (String dataline : datalist) {
             dataline = dataline
-                    .replaceAll("广州", "GZ")
-                    .replaceAll("深圳", "HZ")
-                    .replaceAll("佛山", "FS")
-                    .replaceAll("东莞", "DG")
-                    .replaceAll("中山", "ZS")
-                    .replaceAll("珠海", "ZH")
-                    .replaceAll("江门", "JM")
-                    .replaceAll("肇庆", "ZQ")
-                    .replaceAll("惠州", "HZ")
-                    .replaceAll("汕头", "ST")
-                    .replaceAll("潮州", "CZ")
-                    .replaceAll("揭阳", "JY")
-                    .replaceAll("汕尾", "SW")
-                    .replaceAll("湛江", "ZJ")
-                    .replaceAll("茂名", "MM")
-                    .replaceAll("阳江", "YJ")
-                    .replaceAll("韶关", "SG")
-                    .replaceAll("清远", "QY")
-                    .replaceAll("云浮", "YF")
-                    .replaceAll("梅州", "MZ")
-                    .replaceAll("河源", "HY")
-                    .replaceAll("是", "1")
-                    .replaceAll("否", "0");
+                    .replaceAll("����", "GZ")
+                    .replaceAll("����", "HZ")
+                    .replaceAll("��ɽ", "FS")
+                    .replaceAll("��ݸ", "DG")
+                    .replaceAll("��ɽ", "ZS")
+                    .replaceAll("�麣", "ZH")
+                    .replaceAll("����", "JM")
+                    .replaceAll("����", "ZQ")
+                    .replaceAll("����", "HZ")
+                    .replaceAll("��ͷ", "ST")
+                    .replaceAll("����", "CZ")
+                    .replaceAll("����", "JY")
+                    .replaceAll("��β", "SW")
+                    .replaceAll("տ��", "ZJ")
+                    .replaceAll("ï��", "MM")
+                    .replaceAll("����", "YJ")
+                    .replaceAll("�ع�", "SG")
+                    .replaceAll("��Զ", "QY")
+                    .replaceAll("�Ƹ�", "YF")
+                    .replaceAll("÷��", "MZ")
+                    .replaceAll("��Դ", "HY")
+                    .replaceAll("��", "1")
+                    .replaceAll("��", "0");
             bufwriter.write(dataline);
             bufwriter.newLine();
         }
@@ -568,7 +625,7 @@ public class ModeTxtProcessMain {
             }
             String[] partitions = linestr.replaceAll("\\|", "").trim().split("/");
             /**
-             * 先删掉旧分区，再加新分区。
+             * ��ɾ���ɷ������ټ��·�����
              */
             String droparrtsql = "ALTER TABLE JCFW." + tablename + " DROP IF EXISTS PARTITION (";
 
@@ -599,11 +656,11 @@ public class ModeTxtProcessMain {
         StringBuilder retbuffer = new StringBuilder();
         usermap.keySet().stream().forEach((key) -> {
             StringBuilder sbdf1 = usermap.get(key);
-            retbuffer.append("---").append(key).append("租户脚本---\n");
+            retbuffer.append("---").append(key).append("�⻧�ű�---\n");
             retbuffer.append(sbdf1.toString());
             System.out.println(retbuffer.toString());
         });
-        System.out.println("处理完成");
+        System.out.println("�������");
         return retbuffer;
     }
 
@@ -646,7 +703,7 @@ public class ModeTxtProcessMain {
     }
 
     public static void updateSecurity(Map<String, Table> tableMap) {
-        String filename = "F:\\work\\GDNG3BASS\\01GDNG3BASS文档\\07详细设计\\02模型设计\\元数据\\模型脚本生成工具\\reftable.txt";
+        String filename = "F:\\work\\GDNG3BASS\\01GDNG3BASS�ĵ�\\07��ϸ���\\02ģ�����\\Ԫ����\\ģ�ͽű����ɹ���\\reftable.txt";
         List<String> tables = TextUtil.readTxtFileToList(filename, false);
         for (String tablename : tables) {
             Table table = tableMap.get(tablename);
@@ -678,7 +735,7 @@ public class ModeTxtProcessMain {
 
     public static void test5() {
         String[] branches = {"GZ", "SZ", "DG", "FS", "ST", "ZH", "HZ", "ZS", "JM", "ZJ", "SG", "HY", "MZ", "SW", "YJ", "MM", "ZQ", "QY", "CZ", "JY", "YF"};
-        String filename = "E:\\work\\广东移动NG3项目 -GDNG3BASS\\GDNG3BASS\\01GDNG3BASS文档\\07详细设计\\02模型设计\\元数据\\模型脚本生成工具\\test.txt";
+        String filename = "E:\\work\\�㶫�ƶ�NG3��Ŀ -GDNG3BASS\\GDNG3BASS\\01GDNG3BASS�ĵ�\\07��ϸ���\\02ģ�����\\Ԫ����\\ģ�ͽű����ɹ���\\test.txt";
         List<String> tables = TextUtil.readTxtFileToList(filename, false);
         for (String table : tables) {
             for (String branch : branches) {
@@ -808,7 +865,7 @@ public class ModeTxtProcessMain {
     }
 
     public static void showBranchTablePartitions() {
-        String filename = "C:\\Users\\yx\\Desktop\\检查分地市模型.log";
+        String filename = "C:\\Users\\yx\\Desktop\\���ֵ���ģ��.log";
         try {
             FileInputStream instream = new FileInputStream(filename);
             BufferedReader bufreader = new BufferedReader(new InputStreamReader(instream, "UTF-8"));
@@ -828,7 +885,7 @@ public class ModeTxtProcessMain {
     }
 
     public static void modifyTableSerdClass(Map<String, Table> tabledata) {
-        String filename = "C:\\Users\\yx\\Desktop\\回话20161122_01云平台.log";
+        String filename = "C:\\Users\\yx\\Desktop\\�ػ�20161122_01��ƽ̨.log";
         try {
             FileInputStream instream = new FileInputStream(filename);
             BufferedReader bufreader = new BufferedReader(new InputStreamReader(instream, "UTF-8"));
@@ -870,7 +927,7 @@ public class ModeTxtProcessMain {
     }
 
     public static void modifyPartitionSplit() {
-        String filename = "C:\\Users\\yx\\Desktop\\回话20161116_01云平台.log";
+        String filename = "C:\\Users\\yx\\Desktop\\�ػ�20161116_01��ƽ̨.log";
         try {
             FileInputStream instream = new FileInputStream(filename);
             BufferedReader bufreader = new BufferedReader(new InputStreamReader(instream, "UTF-8"));
@@ -958,7 +1015,7 @@ public class ModeTxtProcessMain {
                     if (buffer == null) {
                         buffer = new StringBuilder();
                         scriptbuffer.put(username, buffer);
-                        buffer.append("----").append(username).append("租户脚本----\r\n");
+                        buffer.append("----").append(username).append("�⻧�ű�----\r\n");
                     }
                     String script = "ALTER TABLE JCFW." + tablename + " ADD PARTITION(branch='" + branch + "');";
                     buffer.append(script).append("\r\n");

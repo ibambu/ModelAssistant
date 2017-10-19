@@ -197,7 +197,7 @@ public class ModeScriptBuilder {
         sqlbuffer.append(tableproperties);//表属性语句
 
         if (table.isConstantParam()) {
-            sqlbuffer.append("\nALTER TABLE JCFW.").append(table.getTableName()).append(" ADD PARTITION (branch='GMCC');\n");
+            sqlbuffer.append("\nALTER TABLE ").append(table.getDbName()).append(".").append(table.getTableName()).append(" ADD PARTITION (branch='GMCC');\n");
         }
         if (isUseProxy) {
             sqlbuffer.append("\"");
@@ -628,6 +628,26 @@ public class ModeScriptBuilder {
         return hqlmap;
     }
 
+    public static Map<String, StringBuilder> changeExtendFlag(List<String> tableNames, Map<String, Table> tableMap,
+            String startDate, String endDate, String[] branches, boolean isUseProxy) {
+        Map<String, StringBuilder> hqlmap = new HashMap<>();
+        StringBuilder hqlBuffer = new StringBuilder();
+        hqlmap.put("AAA", hqlBuffer);
+        for (String tableName : tableNames) {
+            Table table = tableMap.get(tableName);
+            String sql = "update tablefile set extend_cfg ='"+table.getExtendcfg()+"' where dataname ='"+table.getTableName()+"';\n";
+            hqlBuffer.append(sql);
+            if(table.isShared()){
+                for(String branch:branches){
+                    String branchTableName = table.getTableName()+"_"+branch;
+                    String sql1 = "update tablefile set extend_cfg ='"+table.getExtendcfg()+"' where dataname ='"+branchTableName+"';\n";
+                     hqlBuffer.append(sql1);
+                }
+            }
+        }
+        return hqlmap;
+    }
+
     public static Map<String, StringBuilder> changeColumnDelimiter(List<String> tableNames, Map<String, Table> tableMap,
             String startDate, String endDate, String[] branches, boolean isUseProxy) throws ParseException {
         Map<String, StringBuilder> hqlmap = new HashMap<>();
@@ -981,7 +1001,7 @@ public class ModeScriptBuilder {
                 hqlbuffer.append(hqlstr);
             });
         }
-        System.out.println("输入（" + tablenames.size() + " ） 输出（" + successtables.size() + "）  失败（" + failtables.size()+"）");
+        System.out.println("输入（" + tablenames.size() + " ） 输出（" + successtables.size() + "）  失败（" + failtables.size() + "）");
         if (!failtables.isEmpty()) {
             System.out.print("处理失败模型：");
             System.out.println(Arrays.toString(failtables.toArray()));

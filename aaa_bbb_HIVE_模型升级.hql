@@ -1,5 +1,0 @@
-----bd_o
-----ALTER TABLE JCFW.TR_APP_TYP ADD COLUMNS );
-
-
-

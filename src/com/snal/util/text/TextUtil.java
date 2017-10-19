@@ -32,10 +32,10 @@ public class TextUtil {
     }
 
     /**
-     * 读取文本文件内容
+     * 璇诲彇鏂囨湰鏂囦欢鍐呭
      *
      * @param filename
-     * @param doDistinct 是否要去掉重复行
+     * @param doDistinct 鏄惁瑕佸幓鎺夐噸澶嶈
      * @return
      */
     public static List<String> readTxtFileToList(String filename, boolean doDistinct) {
@@ -71,7 +71,7 @@ public class TextUtil {
             bufwriter.close();
             System.out.println("输出结果：" + filename);
         } catch (IOException e) {
-            System.out.println("[FAIL]输出建表语句失败！\n");
+            e.printStackTrace();
         } finally {
             if (bufwriter != null) {
                 bufwriter.close();
