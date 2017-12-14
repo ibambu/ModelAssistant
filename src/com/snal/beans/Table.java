@@ -272,8 +272,23 @@ public class Table implements Cloneable {
         return partitionCols;
     }
 
+    public String getPartitionColsStr() {
+        String retstr = "";
+        for (String a : partitionCols) {
+            retstr += a + ",";
+        }
+        if (retstr != null) {
+            retstr = retstr.substring(0, retstr.length() - 1);
+        }
+        return retstr;
+    }
+
+    public String getMonitorThreshold() {
+        return interfaceTable ? "0.001" : "0.1";
+    }
+
     public void setPartitionCols(String partitionCols) {
-        this.partitionCols =  partitionCols.split(",");
+        this.partitionCols = partitionCols.split(",");
     }
 
     public void setPartitionCols(String[] partitionCols) {
@@ -407,6 +422,19 @@ public class Table implements Cloneable {
 
     public void setShareAllDataToCity(String isShareAllDataToCity) {
         this.shareAllDataToCity = "是".equals(isShareAllDataToCity);
+    }
+
+    public String getPrimaryKeys() {
+        String keystr = "";
+        for (TableCol col : tablecols) {
+            if (col.isIsPrimaryKey()) {
+                keystr += col.getColumnName() + ",";
+            }
+        }
+        if (keystr.trim().length()>0) {
+            keystr = keystr.substring(0, keystr.length() - 1);
+        }
+        return keystr;
     }
 
     @Override

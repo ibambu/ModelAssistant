@@ -86,7 +86,7 @@ public class ModeTxtProcessMain {
 //        gmccTables.add("TO_INTL_VOICE_VSTD_ROAM_DAY");
 //        gmccTables.add("TR_CELL");
 //        gmccTables.add("TR_CELL_TYP");
-        List<String> tableNames = TextUtil.readTxtFileToList(inputfile, true);
+//        List<String> tableNames = TextUtil.readTxtFileToList(inputfile, true);
 //        for(String tableName:tableNames){
 //            Table table = tableMap.get(tableName);
 //            System.out.println(tableName+":"+(table.getTablecols().size()-4));
@@ -99,8 +99,26 @@ public class ModeTxtProcessMain {
 //            }
 //        }
 //        trcellinfo(branches);
-        cdrtest(branches);
+//        cdrtest(branches);
 //        reAddPartitions(tableNames, branches);
+//        checkCreateTableSql();
+        showSharedTable(branches);
+    }
+
+    public static void checkCreateTableSql() {
+        String filename = "C:\\Users\\yx\\Desktop\\1.sql";
+        List<String> newSqlList = new ArrayList();
+        List<String> sqlline = TextUtil.readTxtFileToList(filename, false);
+        for (String sql : sqlline) {
+            if (sql.toLowerCase().contains("create table")) {
+                String dropsql = sql.toLowerCase().replaceAll("create table", "drop table").replace("(", ";");
+                newSqlList.add(dropsql);
+            }
+            newSqlList.add(sql);
+        }
+        for (String sql : newSqlList) {
+            System.out.println(sql);
+        }
     }
 
     public static void hebing() {
@@ -118,13 +136,41 @@ public class ModeTxtProcessMain {
             }
         }
     }
-    public static void countColums(){
-        
+
+    public static void showSharedTable(String[] branches) {
+        List<String> alist = TextUtil.readTxtFileToList("E:\\1.txt", false);
+        List<String> blist = TextUtil.readTxtFileToList("e:\\2.txt", false);
+        for (String a : alist) {
+            boolean isSharedMain = false;
+            boolean isSharedBranch = false;
+            for (String b : blist) {
+                if (a.trim().equalsIgnoreCase(b.trim())) {
+                    isSharedMain = true;
+                    break;
+                }
+            }
+            for (String b : blist) {
+                for (String branch : branches) {
+                    String tableName = a + "_" + branch;
+                    if (tableName.trim().equalsIgnoreCase(b.trim())) {
+                        isSharedBranch = true;
+                        break;
+                    }
+                }
+                if (isSharedBranch) {
+                    break;
+                }
+            }
+            if (isSharedBranch || isSharedMain) {
+                System.out.println(a + "|" + isSharedMain + "|" + isSharedBranch);
+            }
+        }
     }
+
     public static void cdrtest(String[] branches) throws IOException {
         StringBuilder buffer = new StringBuilder();
-        String path ="E:\\i-work\\SVN\\GDBI\\02GDBI代码\\01 主体仓库\\04PERL代码\\PERL脚本\\融合计费清单视图脚本\\";
-        List<String> alist = TextUtil.readTxtFileToList(path+"GPRS_CDR_VIEW.pl", false);
+        String path = "E:\\i-work\\SVN\\GDBI\\02GDBI代码\\01 主体仓库\\04PERL代码\\PERL脚本\\融合计费清单视图脚本\\";
+        List<String> alist = TextUtil.readTxtFileToList(path + "CDR_VIEW示例.SQL", false);
         for (String a : alist) {
             int idx = a.indexOf("--");
             if (idx != -1) {
@@ -132,13 +178,13 @@ public class ModeTxtProcessMain {
             }
             buffer.append(a).append("\n");
         }
-        System.out.println(buffer.toString());
-//        for (String branch : branches) {
-//            String sql = buffer.toString();
-//            sql = sql.replaceAll("GZ20170926", branch + "20170926");
-//            System.out.println(sql);
-//        }
-//        TextUtil.writeToFile(buffer.toString(), "E:\\i-work\\SVN\\GDBI\\02GDBI����\\01 ����ֿ�\\04PERL����\\PERL�ű�\\�ںϼƷ��嵥��ͼ�ű�\\test.pl");
+//        System.out.println(buffer.toString());
+        for (String branch : branches) {
+            String sql = buffer.toString();
+            sql = sql.replaceAll("GZ201710", branch + "201710");
+            System.out.println(sql);
+        }
+//      TextUtil.writeToFile(buffer.toString(), "E:\\i-work\\SVN\\GDBI\\02GDBI����\\01 ����ֿ�\\04PERL����\\PERL�ű�\\�ںϼƷ��嵥��ͼ�ű�\\test.pl");
     }
 
     public static void trcellinfo(String[] branches) {
@@ -250,7 +296,7 @@ public class ModeTxtProcessMain {
 
         Table table = tableMap.get(tableName);
         Optional<Table> table1 = Optional.of(table);
-        table1.map(t->t.getTableName());
+        table1.map(t -> t.getTableName());
         SimpleDateFormat formatDay = new SimpleDateFormat("yyyyMMdd");
         SimpleDateFormat formatMon = new SimpleDateFormat("yyyyMM");
 

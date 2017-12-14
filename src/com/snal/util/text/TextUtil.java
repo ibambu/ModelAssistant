@@ -27,7 +27,7 @@ public class TextUtil {
         FileCharsetDetector charsetDetector = new FileCharsetDetector();
         String code = charsetDetector.guessFileEncoding(file);
         String[] codes = code.split(",");
-        String charset = codes[0].equals("GB2312")?"GBK":codes[0];
+        String charset = codes[0].equals("GB2312") ? "GBK" : codes[0];
         return charset;
     }
 

@@ -7,7 +7,7 @@ package com.snal.main;
 
 import com.snal.beans.TableCol;
 import com.snal.beans.Table;
-import com.snal.util.excel.ExcelUtil;
+import com.snal.dataloader.ModeScriptBuilder;
 import com.snal.util.text.TextUtil;
 import java.io.UnsupportedEncodingException;
 import java.text.SimpleDateFormat;
@@ -15,12 +15,12 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
-import org.apache.poi.ss.usermodel.Workbook;
-import org.apache.poi.xssf.streaming.SXSSFWorkbook;
 
 /**
  *
@@ -62,25 +62,81 @@ public class MetaDataExportMain {
         MetaDataExportMain exportmain = new MetaDataExportMain();
         List<Table> metaTableMap = exportmain.exportTablesForDacp(tablelist, metaDataMap, branches);
         StringBuilder sqlbuffer = new StringBuilder();
-        String insertsql = exportmain.writeTableToExcel(metaTableMap, distFile);
-        sqlbuffer.append(insertsql).append("\n\n");
+        String importSql = exportmain.genImportSql(metaTableMap, distFile);
+        sqlbuffer.append(importSql).append("\n\n");
         return sqlbuffer.toString();
     }
 
-    public String writeTableToExcel(List<Table> tables, String outfile) {
+    public String genImportSql(List<Table> tables, String outfile) {
         String[] headnames1 = {"xmlid", "dbname", "dataname", "datacnname", "state", "cycletype", "topiccode", "extend_cfg", "rightlevel", "creater",
             "curdutyer", "eff_date", "state_date", "team_code", "open_state", "remark"};
         String[] headnames2 = {"xmlid", "col_xmlid", "dataname", "col_seq", "colname", "colcnname", "datatype", "length",
             "precision_val", "party_seq", "isprimarykey", "isnullable", "remark", "filed_type_child", "sensitive_level", "policyid"};
+        StringBuilder sqlBuffer = new StringBuilder();
+        SimpleDateFormat dayFormat = new SimpleDateFormat("yyyyMMdd");
+        String today = dayFormat.format(new Date());
+        /**
+         * 1. 生成数据备份语句
+         */
+        sqlBuffer.append("-- 1. 备份MD库和MDS库以下四个表数据。\n")
+                .append("CREATE TABLE TABLEFILE_BAK_").append(today).append(" AS SELECT * FROM TABLEFILE;\n")
+                .append("CREATE TABLE COLUMN_VAL_BAK_").append(today).append(" AS SELECT * FROM COLUMN_VAL;\n")
+                .append("CREATE TABLE METAOBJ_BAK_").append(today).append(" AS SELECT * FROM METAOBJ;\n")
+                .append("CREATE TABLE TABLEALL_BAK_").append(today).append(" AS SELECT * FROM TABLEALL;\n\n");
+        /**
+         * 2. 生成需要导入的模型列表语句
+         */
+        sqlBuffer.append("\n-- 2. 先清空待导入表列表，然后将本次要同步的模型写入导入列表。 \n")
+                .append("DELETE FROM MD.IMP_TABLE_LIST;\n");
+        tables.stream().map((table) -> "INSERT INTO IMP_TABLE_LIST VALUES ('" + table.getTableName() + "','" + table.getTableId() + "');\n").forEachOrdered((tableImp) -> {
+            sqlBuffer.append(tableImp);
+        });
+        /**
+         * 3. 生成删除模型旧信息
+         */
+        sqlBuffer.append("\n-- 3. 删除MD库和MDS库模型旧信息。 ")
+                .append("DELETE FROM TABLEFILE WHERE DATANAME IN(SELECT TABLE_NAME FROM MD.IMP_TABLE_LIST);").append("\n")
+                .append("DELETE FROM COLUMN_VAL WHERE DATANAME IN(SELECT TABLE_NAME FROM MD.IMP_TABLE_LIST);").append("\n")
+                .append("DELETE FROM METAOBJ WHERE OBJNAME IN(SELECT TABLE_NAME FROM MD.IMP_TABLE_LIST);").append("\n")
+                .append("DELETE FROM TABLEALL WHERE DATANAME IN(SELECT TABLE_NAME FROM MD.IMP_TABLE_LIST);").append("\n");
+        /**
+         * 4. 生成写入模型信息信息语句
+         */
+        sqlBuffer.append("\n-- 4. 写入模型新信息\n");
+        String updateSql = makeImportDataSql(tables, headnames1, headnames2,sqlBuffer);
+        sqlBuffer.append(updateSql);
+        /**
+         * 5. 生成恢复模型状态语句
+         */
+        sqlBuffer.append("\n-- 5. 恢复MD库和MDS库模型状态\n")
+                .append("UPDATE TABLEFILE SET STATE='PUBLISHED' WHERE DATANAME IN (\n")
+                .append("   SELECT TABLE_NAME FROM MD.IMP_TABLE_LIST WHERE TABLE_NAME IN(\n")
+                .append("      SELECT DATANAME FROM TABLEFILE_BAK_")
+                .append(today)
+                .append(" WHERE STATE='PUBLISHED'));");
 
-        String impdatasql = makeImportDataSql(tables, headnames1, headnames2);
+        /**
+         * 6. 生成恢复模型开放状态语句
+         */
+        sqlBuffer.append("\n-- 6. 恢复MDS库模型开放状态\n")
+                .append("update tablefile tf set tf.open_state='开放' where exists(select 1 from meta_team_role_table mtrt where mtrt.xmlid=tf.xmlid) and tf.dataname in(select table_name from md.imp_table_list);");
+        /**
+         * 7. 生成更新元数据对象信息语句
+         */
+        sqlBuffer.append("\n-- 7. 更新MD库和MDS库元数据对象信息\n")
+                .append("INSERT INTO TABLEALL (DBNAME,DATANAME,EFF_DATE,XMLID,MODELTAB,CREATOR,TASKID,DROPDATE)\n")
+                .append("SELECT  DBNAME,  DATANAME,  EFF_DATE,  XMLID,  DATANAME,  '谢英俊',  '20161101',  '9999/12/31' FROM TABLEFILE   WHERE DATANAME  IN (SELECT TABLE_NAME FROM MD.IMP_TABLE_LIST);\n");
+        sqlBuffer.append("INSERT INTO METAOBJ(XMLID, DBNAME, OBJNAME, OBJCNNAME, OBJTYPE, TEAM_CODE, CYCLETYPE, TOPICCODE, EFF_DATE, CREATER, STATE, STATE_DATE, REMARK)\n")
+                .append("SELECT XMLID, DBNAME, DATANAME, DATACNNAME, 'TAB', TEAM_CODE, CYCLETYPE, TOPICCODE, EFF_DATE, CREATER, STATE, STATE_DATE, REMARK FROM TABLEFILE WHERE DATANAME IN (SELECT TABLE_NAME FROM MD.IMP_TABLE_LIST);\n");
+        
+        return sqlBuffer.toString();
 
-        return impdatasql;
     }
 
-    private String makeImportDataSql(List<Table> tables, String[] tableColNames, String[] tableFieldsColNames) {
+    private String makeImportDataSql(List<Table> tables, String[] tableColNames, String[] tableFieldsColNames,StringBuilder mainBuffer) {
         StringBuilder sqlbuffer = new StringBuilder();
-        int count = 0;
+        Map hqlmap = new HashMap();
+        int count = 0, numFile = 0;
         int colcount = 0;
         try {
             String tablecolnam = (Arrays.toString(tableColNames)).replaceAll("\\[", "").replaceAll("\\]", "");
@@ -90,9 +146,9 @@ public class MetaDataExportMain {
             /**
              * 将要导入的模型写入PAAS平台的 IMP_TABLE_LIST 表。
              */
-            tables.stream().map((table) -> "INSERT INTO IMP_TABLE_LIST VALUES ('" + table.getTableName() + "','" + table.getTableId() + "');\n").forEachOrdered((tableImp) -> {
-                sqlbuffer.append(tableImp);
-            });
+//            tables.stream().map((table) -> "INSERT INTO IMP_TABLE_LIST VALUES ('" + table.getTableName() + "','" + table.getTableId() + "');\n").forEachOrdered((tableImp) -> {
+//                sqlbuffer.append(tableImp);
+//            });
             for (Table table : tables) {
                 count++;
                 sqlbuffer.append("\n");
@@ -142,6 +198,14 @@ public class MetaDataExportMain {
                         sqlbuffer.append(insertsql2).append("\n");
                         colcount++;
                     }
+                }
+                if (count % 400 == 0 || count == tables.size()) {
+                    numFile++;
+                    hqlmap.put("IMP_" + numFile, sqlbuffer);
+                    mainBuffer.append(sqlbuffer.toString());
+                    ModeScriptBuilder.writeToFile(hqlmap, "IMP_" + numFile);
+                    hqlmap.clear();
+                    sqlbuffer.delete(0, sqlbuffer.length());
                 }
             }
         } catch (Exception e) {

@@ -102,6 +102,7 @@ public class ModeScriptBuilder {
         Map<String, StringBuilder> hqlmap = new HashMap();
         List<String> failtables = new ArrayList();//存放生成建表语句失败的模型
         List<String> successtables = new ArrayList();//存放生成建表语句成功的模型
+        StringBuilder ruleBuffer = new StringBuilder();//用来存放数据质量检查规则（主键检查规则）
         if (tablenames != null) {
             tablenames.stream().map((tablename) -> metadata.get(tablename)).forEach((table) -> {
                 if (table != null) {
@@ -112,8 +113,18 @@ public class ModeScriptBuilder {
                         hqlmap.put(table.getTenantUser(), hqlbuffer);
                     }
                     hqlbuffer.append(hqlstr);
+                    /**
+                     * 主键规则
+                     */
+                    String rule = "";
+                    if (table.getPrimaryKeys() != null && table.getPrimaryKeys().trim().length() > 0) {
+                        rule = "\"" + table.getDbName() + "." + table.getTableName() + "\",\"PK_CHK\",1,\"PK\",\"" + table.getPrimaryKeys() + "\",\""
+                                + table.getPartitionColsStr() + "\",1.00," + table.getMonitorThreshold() + ",\"N\"";
+                    }
+                    ruleBuffer.append(rule).append("\n");
                 }
             });
+            hqlmap.put("CTL.HIVE_CHECK_RULE", ruleBuffer);
         }
         System.out.println("输入（" + tablenames.size() + "）  输出（" + successtables.size() + "）  失败（" + failtables.size() + ")");
         if (!failtables.isEmpty()) {
@@ -635,13 +646,13 @@ public class ModeScriptBuilder {
         hqlmap.put("AAA", hqlBuffer);
         for (String tableName : tableNames) {
             Table table = tableMap.get(tableName);
-            String sql = "update tablefile set extend_cfg ='"+table.getExtendcfg()+"' where dataname ='"+table.getTableName()+"';\n";
+            String sql = "update tablefile set extend_cfg ='" + table.getExtendcfg() + "' where dataname ='" + table.getTableName() + "';\n";
             hqlBuffer.append(sql);
-            if(table.isShared()){
-                for(String branch:branches){
-                    String branchTableName = table.getTableName()+"_"+branch;
-                    String sql1 = "update tablefile set extend_cfg ='"+table.getExtendcfg()+"' where dataname ='"+branchTableName+"';\n";
-                     hqlBuffer.append(sql1);
+            if (table.isShared()) {
+                for (String branch : branches) {
+                    String branchTableName = table.getTableName() + "_" + branch;
+                    String sql1 = "update tablefile set extend_cfg ='" + table.getExtendcfg() + "' where dataname ='" + branchTableName + "';\n";
+                    hqlBuffer.append(sql1);
                 }
             }
         }
@@ -1041,7 +1052,9 @@ public class ModeScriptBuilder {
                 for (String key : dataBufferMap.keySet()) {
                     String usrRentSql = dataBufferMap.get(key).toString();
                     String outFileName = filename;
-                    if (key != null && key.trim().length() > 0) {
+                    if (key.equalsIgnoreCase("CTL.HIVE_CHECK_RULE")) {
+                        outFileName = System.getProperty("user.dir") + "\\" + key.toUpperCase() + ".txt";
+                    } else if (key != null && key.trim().length() > 0) {
                         outFileName = System.getProperty("user.dir") + "\\" + key.toUpperCase() + ".sql";
                     }
                     OutputStreamWriter writerStream = new OutputStreamWriter(new FileOutputStream(outFileName), "UTF-8");

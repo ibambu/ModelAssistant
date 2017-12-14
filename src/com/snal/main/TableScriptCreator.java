@@ -7,6 +7,7 @@ package com.snal.main;
 
 import com.snal.beans.TenantAttribute;
 import com.snal.beans.Table;
+import com.snal.beans.TableCol;
 import com.snal.dataloader.MetaDataLoader;
 import com.snal.dataloader.ModeScriptBuilder;
 import com.snal.dataloader.PropertiesFileLoader;
@@ -51,7 +52,7 @@ public class TableScriptCreator {
          * 检查模型名称是否有空格或者空行
          */
         boolean isValid = true;
-        if (!optionValue.equals("5") ) {
+        if (!optionValue.equals("5")) {
             for (String tablename : modelist) {
                 if (tablename.contains(" ") || tablename.trim().length() == 0) {
                     System.out.println("[" + tablename + "] 模型名前后不能包含空格或者是空行！");
@@ -69,6 +70,7 @@ public class TableScriptCreator {
         String metaDataFile = optionValue.equals("7") ? db2MetaDataFile : hiveMetaDataFile;
         System.out.println("正在加载并检查元数据：" + metaDataFile);
         Map<String, Table> tableMap = metaDataUtil.loadMetaData(metaDataFile, tenantMap, startsheet, endsheet, mincelltoread);
+        System.out.println("元数据加载完毕...");
         /**
          * 检查模型字段是否正确
          */
@@ -79,9 +81,26 @@ public class TableScriptCreator {
                 System.out.println("模型不存在：" + tablename);
                 continue;
             }
-            if (!optionValue.equals("7")&& !optionValue.equals("12") && !optionValue.equals("4")) {
+            if (!optionValue.equals("7") && !optionValue.equals("12") && !optionValue.equals("4")) {
                 if (!table.getStoredFormat().equalsIgnoreCase("PARQUET") && !table.isConstantParam()) {
                     System.out.println(table.getTableName() + " 存储格式不是PARQUET，可能影响性能，是否继续(Y/N)？");
+                    String optional = scanner.nextLine();
+                    if (!optional.equalsIgnoreCase("Y")) {
+                        isValid = false;
+                        break;
+                    }
+                }
+                /**
+                 * 主键检查
+                 */
+                int pkCount = 0;
+                for (TableCol col : table.getTablecols()) {
+                    if (col.isIsPrimaryKey()) {
+                        pkCount++;
+                    }
+                }
+                if (pkCount == 0) {
+                    System.out.println(table.getTableName() + " 缺少主键，是否继续(Y/N)？");
                     String optional = scanner.nextLine();
                     if (!optional.equalsIgnoreCase("Y")) {
                         isValid = false;

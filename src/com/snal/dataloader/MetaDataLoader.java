@@ -297,6 +297,9 @@ public class MetaDataLoader {
         table.setCycleType(tableindx.get(i++));
         table.setTopicName(tableindx.get(i++));
         table.setTopicCode(tableindx.get(i++));
+        if (table.getTopicName().startsWith("基础层")) {
+            table.setInterfaceTable("是");//是否接口模型，用于设置数据质量监控阀值。
+        }
         table.setTenantUser(tableindx.get(i++));
         table.setColDelimiter(tableindx.get(i++));
         String partcols = tableindx.get(i++);
@@ -323,19 +326,21 @@ public class MetaDataLoader {
         }
         table.setCharacterSet(tableindx.get(i++));
 //        table.setSerdeClass(tableindx.get(i++));//取消从excel读取，因为excel经常有人填错。
-        table.setRightlevel(tableindx.get(i++));
+//        table.setRightlevel(tableindx.get(i++));//取消该字段，敏感级别通过安全等级自动计算。
         table.setCreater(tableindx.get(i++));
-        table.setCurdutyer(tableindx.get(i++));
-        table.setEffDate(tableindx.get(i++));
-        if (table.getEffDate() == null||table.getEffDate().trim().length()==0) {
+//        table.setCurdutyer(tableindx.get(i++));//PAAS 平台填写固定值。
+        table.setEffDate(tableindx.get(i++));//创建时间
+        if (table.getEffDate() == null || table.getEffDate().trim().length() == 0) {
             table.setEffDate("2016/10/01");
         }
         table.setStateDate(tableindx.get(i++));
-        if (table.getStateDate() == null||table.getStateDate().trim().length()==0) {
+
+        if (table.getStateDate() == null || table.getStateDate().trim().length() == 0) {
             table.setStateDate("2016/10/01");
         }
-        table.setOpenState(tableindx.get(i++));
+//        table.setOpenState(tableindx.get(i++));//改字段已经失效
         table.setRemark(tableindx.get(i++));
+        table.setRemark(table.getTopicName());
         if ("HIVE".equals(table.getDbType())) {
             //table.setIsVIP218(tableindx.get(i++));已经无用处
             table.setShared(tableindx.get(i++));
