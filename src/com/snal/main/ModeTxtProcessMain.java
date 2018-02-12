@@ -32,7 +32,6 @@ import java.util.Optional;
 import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import java.util.stream.Stream;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
@@ -99,10 +98,20 @@ public class ModeTxtProcessMain {
 //            }
 //        }
 //        trcellinfo(branches);
-//        cdrtest(branches);
+        SimpleDateFormat sdfDay = new SimpleDateFormat("yyyyMMdd");
+        Calendar oldday = Calendar.getInstance();
+        oldday.setTime(sdfDay.parse("20171201"));
+
+        Calendar nowDay = Calendar.getInstance();
+        nowDay.setTime(sdfDay.parse("20171227"));
+        
+         while(nowDay.after(oldday)||nowDay.equals(oldday)){
+            cdrtest(branches,sdfDay.format(nowDay.getTime()),"STAGE.TS_E_GPRS_CDR_VIEW");
+            nowDay.add(Calendar.DAY_OF_MONTH, -1);
+         }
 //        reAddPartitions(tableNames, branches);
 //        checkCreateTableSql();
-        showSharedTable(branches);
+//        showSharedTable(branches);
     }
 
     public static void checkCreateTableSql() {
@@ -167,10 +176,12 @@ public class ModeTxtProcessMain {
         }
     }
 
-    public static void cdrtest(String[] branches) throws IOException {
+    public static void cdrtest(String[] branches,String datetime,String viewName) throws IOException {
         StringBuilder buffer = new StringBuilder();
+        StringBuilder databuffer = new StringBuilder();
+        String filename = viewName+"_AA"+datetime+".SQL";
         String path = "E:\\i-work\\SVN\\GDBI\\02GDBI代码\\01 主体仓库\\04PERL代码\\PERL脚本\\融合计费清单视图脚本\\";
-        List<String> alist = TextUtil.readTxtFileToList(path + "CDR_VIEW示例.SQL", false);
+        List<String> alist = TextUtil.readTxtFileToList(path + "STAGE.TS_E_GPRS_CDR_VIEW_GZ.SQL", false);
         for (String a : alist) {
             int idx = a.indexOf("--");
             if (idx != -1) {
@@ -178,13 +189,12 @@ public class ModeTxtProcessMain {
             }
             buffer.append(a).append("\n");
         }
-//        System.out.println(buffer.toString());
         for (String branch : branches) {
             String sql = buffer.toString();
-            sql = sql.replaceAll("GZ201710", branch + "201710");
-            System.out.println(sql);
+            sql = sql.replaceAll("GZ20171001", branch + datetime).replaceAll("201710", datetime.substring(0,6));
+            databuffer.append(sql).append("\n");
         }
-//      TextUtil.writeToFile(buffer.toString(), "E:\\i-work\\SVN\\GDBI\\02GDBI����\\01 ����ֿ�\\04PERL����\\PERL�ű�\\�ںϼƷ��嵥��ͼ�ű�\\test.pl");
+      TextUtil.writeToFile(databuffer.toString(), "E:\\i-work\\SVN\\GDBI\\02GDBI代码\\01 主体仓库\\04PERL代码\\PERL脚本\\融合计费清单视图脚本\\data\\GPRSCDR_VIEW\\"+filename);
     }
 
     public static void trcellinfo(String[] branches) {

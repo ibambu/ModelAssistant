@@ -11,6 +11,8 @@ import com.snal.beans.TableCol;
 import com.snal.dataloader.MetaDataLoader;
 import com.snal.dataloader.ModeScriptBuilder;
 import com.snal.dataloader.PropertiesFileLoader;
+import com.snal.service.impl.HiveModelSyncPaasService;
+import com.snal.service.IModelSyncPaasService;
 import com.snal.util.text.TextUtil;
 import java.io.IOException;
 import java.util.Arrays;
@@ -81,7 +83,7 @@ public class TableScriptCreator {
                 System.out.println("模型不存在：" + tablename);
                 continue;
             }
-            if (!optionValue.equals("7") && !optionValue.equals("12") && !optionValue.equals("4")) {
+            if (!optionValue.equals("7") && !optionValue.equals("12") && !optionValue.equals("4") && !optionValue.equals("13")) {
                 if (!table.getStoredFormat().equalsIgnoreCase("PARQUET") && !table.isConstantParam()) {
                     System.out.println(table.getTableName() + " 存储格式不是PARQUET，可能影响性能，是否继续(Y/N)？");
                     String optional = scanner.nextLine();
@@ -122,7 +124,11 @@ public class TableScriptCreator {
             switch (optionValue) {
                 case "1":
                     hqlmap = ModeScriptBuilder.makeHiveMainTableScript(modelist, tableMap, branchList, outputSharedTable, useproxy);
-                    ModeScriptBuilder.writeToFile(hqlmap, outputfile);
+                    IModelSyncPaasService syncService = new HiveModelSyncPaasService();
+                    System.out.println("export table to pass...");
+                    String importsql = syncService.syncModelToPaas(modelist, tableMap, branchList);
+                    hqlmap.put("import_to_pass", new StringBuilder(importsql));
+                    ModeScriptBuilder.writeToFile(hqlmap, importpaasfile);
                     break;
                 case "2":
                     hqlmap = ModeScriptBuilder.makeHiveBranchTableScript(modelist, tableMap, branchList, useproxy);
@@ -131,10 +137,10 @@ public class TableScriptCreator {
                 case "3":
                     break;
                 case "4":
-                    MetaDataExportMain exportmain = new MetaDataExportMain();
+                    MetaDataExportMain exportmain1 = new MetaDataExportMain();
 
-                    String importsql = exportmain.exportBranchTables(modelist, tableMap, outputfile, branchList);
-                    hqlmap.put("XX", new StringBuilder(importsql));
+                    String importsql1 = exportmain1.exportBranchTables(modelist, tableMap, outputfile, branchList);
+                    hqlmap.put("XX", new StringBuilder(importsql1));
                     ModeScriptBuilder.writeToFile(hqlmap, importpaasfile);
                     break;
                 case "5":
@@ -155,7 +161,7 @@ public class TableScriptCreator {
                     ModeScriptBuilder.changeColumnSecurityType(modelist, tableMap, branchList);
                     break;
                 case "9":
-                    hqlmap = ModeScriptBuilder.addBranchTablePartition(modelist, tableMap, "20161001", "20170810", branchList);
+                    hqlmap = ModeScriptBuilder.addBranchTablePartition(modelist, tableMap, "20180122", "20180128", branchList);
                     ModeScriptBuilder.writeToFile(hqlmap, outputfile);
                     break;
                 case "10":
@@ -168,6 +174,10 @@ public class TableScriptCreator {
                     break;
                 case "12":
                     hqlmap = ModeScriptBuilder.changeExtendFlag(modelist, tableMap, "20161001", "20161130", branchList, false);
+                    ModeScriptBuilder.writeToFile(hqlmap, outputfile);
+                    break;
+                case "13":
+                    hqlmap = ModeScriptBuilder.offlineTables(modelist, tableMap, branchList, false);
                     ModeScriptBuilder.writeToFile(hqlmap, outputfile);
                     break;
                 default:

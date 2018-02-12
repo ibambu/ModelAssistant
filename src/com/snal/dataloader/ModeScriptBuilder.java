@@ -615,6 +615,8 @@ public class ModeScriptBuilder {
             String startDate, String endDate, String[] branches) throws ParseException {
         Map<String, StringBuilder> hqlmap = new HashMap<>();
         int count = 0;
+        int havesqlcnt = 0;
+        int nosqlcnt = 0;
         for (String tableName : tableNames) {
             Table table = tableMap.get(tableName);
             StringBuilder hqlBuffer = hqlmap.get(table.getTenantUser());
@@ -622,20 +624,54 @@ public class ModeScriptBuilder {
                 hqlBuffer = new StringBuilder("----" + table.getTenantUser() + "租户脚本----\n");
                 hqlmap.put(table.getTenantUser(), hqlBuffer);
             }
-            String hql = makeBranchTablePartition(table, startDate, endDate, branches);
-            if (hql.length() != 0) {
+            String hql1 = makeMainTablePartition(table, startDate, endDate, branches);
+            if(hql1.length()!=0){
                 count++;
-            } else {
-                System.out.println(tableName);
             }
-            hqlBuffer.append(hql).append("\n");
+            hqlBuffer.append(hql1).append("\n");
+            if (table.isShared()) {
+                String hql = makeBranchTablePartition(table, startDate, endDate, branches);
+                if (hql.length() != 0) {
+                    havesqlcnt++;
+                    System.out.println("have sql:" + tableName);
+                } else {
+                    nosqlcnt ++;
+                    System.out.println("no sql:" + tableName);
+                }
+                hqlBuffer.append(hql).append("\n");
+            } else {
+                System.out.println("no share:" + tableName);
+            }
+
         }
 //        StringBuilder hqlBuffer = new StringBuilder();
 //        hqlmap.keySet().stream().map((username) -> hqlmap.get(username).toString()).forEachOrdered((hql) -> {
 //            hqlBuffer.append(hql);
 //        });
 //        System.out.println(hqlBuffer.toString());
-        System.out.println("count:" + count);
+        System.out.println("count:"+count+" have sql:" + havesqlcnt + "\n no sql:" + nosqlcnt);
+        return hqlmap;
+    }
+
+    public static Map<String, StringBuilder> offlineTables(List<String> tableNames, Map<String, Table> tableMap,
+            String[] branches, boolean isUseProxy) {
+        Map<String, StringBuilder> hqlmap = new HashMap<>();
+        StringBuilder hqlBuffer = new StringBuilder();
+        hqlmap.put("OFFLINE", hqlBuffer);
+        for (String tableName : tableNames) {
+            Table table = tableMap.get(tableName);
+            String sql = "update tablefile set state ='INVALID' where dataname ='" + table.getTableName() + "';\n";
+            hqlBuffer.append(sql);
+            hqlBuffer.append("update metaobj set state ='INVALID' where objname ='").append(table.getTableName()).append("';\n");
+            if (table.isShared()) {
+                for (String branch : branches) {
+                    String branchTableName = table.getTableName() + "_" + branch;
+                    String sql1 = "update tablefile set state ='INVALID' where dataname ='" + branchTableName + "';\n";
+                    hqlBuffer.append(sql1);
+                    hqlBuffer.append("update metaobj set state ='INVALID' where objname ='").append(branchTableName).append("';\n");
+                }
+            }
+        }
         return hqlmap;
     }
 
@@ -862,6 +898,64 @@ public class ModeScriptBuilder {
     }
 
     /**
+     * 主模型加分区
+     *
+     * @param table
+     * @param startDate
+     * @param endDate
+     * @param branches
+     * @return
+     * @throws ParseException
+     */
+    public static String makeMainTablePartition(Table table, String startDate, String endDate, String[] branches) throws ParseException {
+        SimpleDateFormat sdfDay = new SimpleDateFormat("yyyyMMdd");
+        SimpleDateFormat sdfMon = new SimpleDateFormat("yyyyMM");
+
+        Calendar oldday = Calendar.getInstance();
+        oldday.setTime(sdfDay.parse(startDate));
+
+        Calendar nowDay = Calendar.getInstance();
+        nowDay.setTime(sdfDay.parse(endDate));
+        Calendar nowMon = Calendar.getInstance();
+        nowMon.setTime(sdfDay.parse(endDate));
+
+        StringBuilder sqlbuffer = new StringBuilder();
+        List parititons = Arrays.asList(table.getPartitionCols());
+        if (parititons.contains("month") && parititons.contains("day")) {
+            while (nowDay.after(oldday)) {
+                sqlbuffer.append("perl ~etl/dssprog/bin/hadoop_cli.pl ").append(table.getTenantUser()).append(" beeline -e \"USE JCFW;");
+                for (String branch : branches) {
+                    String alterTabelStr = "ALTER TABLE JCFW." + table.getTableName() + " ADD PARTITION (";
+                    String pStr = "branch='" + branch + "', month=" + sdfMon.format(nowDay.getTime()) + ",day=" + sdfDay.format(nowDay.getTime());
+                    sqlbuffer.append(alterTabelStr).append(pStr).append(");");
+                }
+                sqlbuffer.append("\"\n");
+                nowDay.add(Calendar.DAY_OF_MONTH, -1);
+            }
+        } else if (parititons.contains("month") && !parititons.contains("day")) {
+            while (nowMon.after(oldday)) {
+                sqlbuffer.append("perl ~etl/dssprog/bin/hadoop_cli.pl ").append(table.getTenantUser()).append(" beeline -e \"");
+                for (String branch : branches) {
+                    String alterTabelStr = "ALTER TABLE JCFW." + table.getTableName() + " ADD PARTITION (";
+                    String pStr = "branch='" + branch + "',month=" + sdfMon.format(nowMon.getTime());
+                    sqlbuffer.append(alterTabelStr).append(pStr).append(");");
+                }
+                sqlbuffer.append("\"\n");
+                nowMon.add(Calendar.MONTH, -1);
+            }
+        } else if (!parititons.contains("month") && !parititons.contains("day")) {
+            sqlbuffer.append("perl ~etl/dssprog/bin/hadoop_cli.pl ").append(table.getTenantUser()).append(" beeline -e \"");
+            for (String branch : branches) {
+                String alterTabelStr = "ALTER TABLE JCFW." + table.getTableName() + " ADD PARTITION (";
+                String pStr = "branch='" + branch + "'";
+                sqlbuffer.append(alterTabelStr).append(pStr).append(");");
+            }
+            sqlbuffer.append("\"\n");
+        }
+        return sqlbuffer.toString();
+    }
+
+    /**
      * 给地市模型建分区
      *
      * @param table
@@ -887,10 +981,10 @@ public class ModeScriptBuilder {
         List parititons = Arrays.asList(table.getPartitionCols());
         if (parititons.contains("month") && parititons.contains("day")) {
             while (nowDay.after(oldday)) {
-                sqlbuffer.append("perl ~schadm/dssprog/bin/remote_cli.pl bd_b beeline -e \"USE JCFW;");
+                sqlbuffer.append("perl ~etl/dssprog/bin/hadoop_cli.pl ").append(table.getTenantUser()).append(" beeline -e \"");
                 for (String branch : branches) {
-                    String alterTabelStr = "ALTER TABLE JCFW." + table.getTableName() + " ADD PARTITION (";
-                    String pStr = "branch='" + branch + "', month=" + sdfMon.format(nowDay.getTime()) + ",day=" + sdfDay.format(nowDay.getTime());
+                    String alterTabelStr = "ALTER TABLE JCFW." + table.getTableName() + "_" + branch + " ADD PARTITION (";
+                    String pStr = "month=" + sdfMon.format(nowDay.getTime()) + ",day=" + sdfDay.format(nowDay.getTime());
                     sqlbuffer.append(alterTabelStr).append(pStr).append(");");
                 }
                 sqlbuffer.append("\"\n");
@@ -898,11 +992,13 @@ public class ModeScriptBuilder {
             }
         } else if (parititons.contains("month") && !parititons.contains("day")) {
             while (nowMon.after(oldday)) {
+                sqlbuffer.append("perl ~etl/dssprog/bin/hadoop_cli.pl ").append(table.getTenantUser()).append(" beeline -e \"");
                 for (String branch : branches) {
                     String alterTabelStr = "ALTER TABLE JCFW." + table.getTableName() + "_" + branch + " ADD PARTITION (";
                     String pStr = "month=" + sdfMon.format(nowMon.getTime());
-                    sqlbuffer.append(alterTabelStr).append(pStr).append(");\n");
+                    sqlbuffer.append(alterTabelStr).append(pStr).append(");");
                 }
+                sqlbuffer.append("\"\n");
                 nowMon.add(Calendar.MONTH, -1);
             }
         }

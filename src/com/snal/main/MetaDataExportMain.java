@@ -62,12 +62,12 @@ public class MetaDataExportMain {
         MetaDataExportMain exportmain = new MetaDataExportMain();
         List<Table> metaTableMap = exportmain.exportTablesForDacp(tablelist, metaDataMap, branches);
         StringBuilder sqlbuffer = new StringBuilder();
-        String importSql = exportmain.genImportSql(metaTableMap, distFile);
+        String importSql = exportmain.genImportSql(metaTableMap);
         sqlbuffer.append(importSql).append("\n\n");
         return sqlbuffer.toString();
     }
 
-    public String genImportSql(List<Table> tables, String outfile) {
+    public String genImportSql(List<Table> tables) {
         String[] headnames1 = {"xmlid", "dbname", "dataname", "datacnname", "state", "cycletype", "topiccode", "extend_cfg", "rightlevel", "creater",
             "curdutyer", "eff_date", "state_date", "team_code", "open_state", "remark"};
         String[] headnames2 = {"xmlid", "col_xmlid", "dataname", "col_seq", "colname", "colcnname", "datatype", "length",
@@ -79,10 +79,14 @@ public class MetaDataExportMain {
          * 1. 生成数据备份语句
          */
         sqlBuffer.append("-- 1. 备份MD库和MDS库以下四个表数据。\n")
-                .append("CREATE TABLE TABLEFILE_BAK_").append(today).append(" AS SELECT * FROM TABLEFILE;\n")
-                .append("CREATE TABLE COLUMN_VAL_BAK_").append(today).append(" AS SELECT * FROM COLUMN_VAL;\n")
-                .append("CREATE TABLE METAOBJ_BAK_").append(today).append(" AS SELECT * FROM METAOBJ;\n")
-                .append("CREATE TABLE TABLEALL_BAK_").append(today).append(" AS SELECT * FROM TABLEALL;\n\n");
+                .append("CREATE TABLE TABLEFILE_BAK_").append(today).append(" AS SELECT * FROM MD.TABLEFILE;\n")
+                .append("CREATE TABLE COLUMN_VAL_BAK_").append(today).append(" AS SELECT * FROM MD.COLUMN_VAL;\n")
+                .append("CREATE TABLE METAOBJ_BAK_").append(today).append(" AS SELECT * FROM MD.METAOBJ;\n")
+                .append("CREATE TABLE TABLEALL_BAK_").append(today).append(" AS SELECT * FROM MD.TABLEALL;\n\n")
+                .append("CREATE TABLE TABLEFILE_BAK_").append(today).append(" AS SELECT * FROM MDS.TABLEFILE;\n")
+                .append("CREATE TABLE COLUMN_VAL_BAK_").append(today).append(" AS SELECT * FROM MDS.COLUMN_VAL;\n")
+                .append("CREATE TABLE METAOBJ_BAK_").append(today).append(" AS SELECT * FROM MDS.METAOBJ;\n")
+                .append("CREATE TABLE TABLEALL_BAK_").append(today).append(" AS SELECT * FROM MDS.TABLEALL;\n\n");
         /**
          * 2. 生成需要导入的模型列表语句
          */
@@ -94,46 +98,61 @@ public class MetaDataExportMain {
         /**
          * 3. 生成删除模型旧信息
          */
-        sqlBuffer.append("\n-- 3. 删除MD库和MDS库模型旧信息。 ")
-                .append("DELETE FROM TABLEFILE WHERE DATANAME IN(SELECT TABLE_NAME FROM MD.IMP_TABLE_LIST);").append("\n")
-                .append("DELETE FROM COLUMN_VAL WHERE DATANAME IN(SELECT TABLE_NAME FROM MD.IMP_TABLE_LIST);").append("\n")
-                .append("DELETE FROM METAOBJ WHERE OBJNAME IN(SELECT TABLE_NAME FROM MD.IMP_TABLE_LIST);").append("\n")
-                .append("DELETE FROM TABLEALL WHERE DATANAME IN(SELECT TABLE_NAME FROM MD.IMP_TABLE_LIST);").append("\n");
+        sqlBuffer.append("\n-- 3. 删除MD库和MDS库模型旧信息。 \n")
+                .append("DELETE FROM MD.TABLEFILE WHERE DATANAME IN(SELECT TABLE_NAME FROM MD.IMP_TABLE_LIST);").append("\n")
+                .append("DELETE FROM MD.COLUMN_VAL WHERE DATANAME IN(SELECT TABLE_NAME FROM MD.IMP_TABLE_LIST);").append("\n")
+                .append("DELETE FROM MD.METAOBJ WHERE OBJNAME IN(SELECT TABLE_NAME FROM MD.IMP_TABLE_LIST);").append("\n")
+                .append("DELETE FROM MD.TABLEALL WHERE DATANAME IN(SELECT TABLE_NAME FROM MD.IMP_TABLE_LIST);").append("\n\n")
+                .append("DELETE FROM MDS.TABLEFILE WHERE DATANAME IN(SELECT TABLE_NAME FROM MD.IMP_TABLE_LIST);").append("\n")
+                .append("DELETE FROM MDS.COLUMN_VAL WHERE DATANAME IN(SELECT TABLE_NAME FROM MD.IMP_TABLE_LIST);").append("\n")
+                .append("DELETE FROM MDS.METAOBJ WHERE OBJNAME IN(SELECT TABLE_NAME FROM MD.IMP_TABLE_LIST);").append("\n")
+                .append("DELETE FROM MDS.TABLEALL WHERE DATANAME IN(SELECT TABLE_NAME FROM MD.IMP_TABLE_LIST);").append("\n");
         /**
          * 4. 生成写入模型信息信息语句
          */
         sqlBuffer.append("\n-- 4. 写入模型新信息\n");
-        String updateSql = makeImportDataSql(tables, headnames1, headnames2,sqlBuffer);
-        sqlBuffer.append(updateSql);
+        String updateSql1 = makeImportDataSql("MD",tables, headnames1, headnames2, sqlBuffer);
+        String updateSql2 = makeImportDataSql("MDS",tables, headnames1, headnames2, sqlBuffer);
+        sqlBuffer.append(updateSql1).append("\n");
+        sqlBuffer.append(updateSql2);
         /**
          * 5. 生成恢复模型状态语句
          */
         sqlBuffer.append("\n-- 5. 恢复MD库和MDS库模型状态\n")
-                .append("UPDATE TABLEFILE SET STATE='PUBLISHED' WHERE DATANAME IN (\n")
+                .append("UPDATE MD.TABLEFILE SET STATE='PUBLISHED' WHERE DATANAME IN (\n")
+                .append("   SELECT TABLE_NAME FROM MD.IMP_TABLE_LIST WHERE TABLE_NAME IN(\n")
+                .append("      SELECT DATANAME FROM TABLEFILE_BAK_")
+                .append(today)
+                .append(" WHERE STATE='PUBLISHED'));\n")
+                .append("UPDATE MDS.TABLEFILE SET STATE='PUBLISHED' WHERE DATANAME IN (\n")
                 .append("   SELECT TABLE_NAME FROM MD.IMP_TABLE_LIST WHERE TABLE_NAME IN(\n")
                 .append("      SELECT DATANAME FROM TABLEFILE_BAK_")
                 .append(today)
                 .append(" WHERE STATE='PUBLISHED'));");
-
         /**
          * 6. 生成恢复模型开放状态语句
          */
         sqlBuffer.append("\n-- 6. 恢复MDS库模型开放状态\n")
-                .append("update tablefile tf set tf.open_state='开放' where exists(select 1 from meta_team_role_table mtrt where mtrt.xmlid=tf.xmlid) and tf.dataname in(select table_name from md.imp_table_list);");
+                .append("update mds.tablefile tf set tf.open_state='开放' where exists(select 1 from mds.meta_team_role_table mtrt where mtrt.xmlid=tf.xmlid) and tf.dataname in(select table_name from md.imp_table_list);");
         /**
          * 7. 生成更新元数据对象信息语句
          */
         sqlBuffer.append("\n-- 7. 更新MD库和MDS库元数据对象信息\n")
-                .append("INSERT INTO TABLEALL (DBNAME,DATANAME,EFF_DATE,XMLID,MODELTAB,CREATOR,TASKID,DROPDATE)\n")
-                .append("SELECT  DBNAME,  DATANAME,  EFF_DATE,  XMLID,  DATANAME,  '谢英俊',  '20161101',  '9999/12/31' FROM TABLEFILE   WHERE DATANAME  IN (SELECT TABLE_NAME FROM MD.IMP_TABLE_LIST);\n");
-        sqlBuffer.append("INSERT INTO METAOBJ(XMLID, DBNAME, OBJNAME, OBJCNNAME, OBJTYPE, TEAM_CODE, CYCLETYPE, TOPICCODE, EFF_DATE, CREATER, STATE, STATE_DATE, REMARK)\n")
-                .append("SELECT XMLID, DBNAME, DATANAME, DATACNNAME, 'TAB', TEAM_CODE, CYCLETYPE, TOPICCODE, EFF_DATE, CREATER, STATE, STATE_DATE, REMARK FROM TABLEFILE WHERE DATANAME IN (SELECT TABLE_NAME FROM MD.IMP_TABLE_LIST);\n");
-        
+                .append("INSERT INTO MD.TABLEALL (DBNAME,DATANAME,EFF_DATE,XMLID,MODELTAB,CREATOR,TASKID,DROPDATE)\n")
+                .append("SELECT  DBNAME,  DATANAME,  EFF_DATE,  XMLID,  DATANAME,  '谢英俊',  '20161101',  '9999/12/31' FROM MD.TABLEFILE   WHERE DATANAME  IN (SELECT TABLE_NAME FROM MD.IMP_TABLE_LIST);\n");
+        sqlBuffer.append("INSERT INTO MD.METAOBJ(XMLID, DBNAME, OBJNAME, OBJCNNAME, OBJTYPE, TEAM_CODE, CYCLETYPE, TOPICCODE, EFF_DATE, CREATER, STATE, STATE_DATE, REMARK)\n")
+                .append("SELECT XMLID, DBNAME, DATANAME, DATACNNAME, 'TAB', TEAM_CODE, CYCLETYPE, TOPICCODE, EFF_DATE, CREATER, STATE, STATE_DATE, REMARK FROM MD.TABLEFILE WHERE DATANAME IN (SELECT TABLE_NAME FROM MD.IMP_TABLE_LIST);\n\n");
+        sqlBuffer.append("INSERT INTO MDS.TABLEALL (DBNAME,DATANAME,EFF_DATE,XMLID,MODELTAB,CREATOR,TASKID,DROPDATE)\n")
+                .append("SELECT  DBNAME,  DATANAME,  EFF_DATE,  XMLID,  DATANAME,  '谢英俊',  '20161101',  '9999/12/31' FROM MDS.TABLEFILE   WHERE DATANAME  IN (SELECT TABLE_NAME FROM MD.IMP_TABLE_LIST);\n");
+        sqlBuffer.append("INSERT INTO MDS.METAOBJ(XMLID, DBNAME, OBJNAME, OBJCNNAME, OBJTYPE, TEAM_CODE, CYCLETYPE, TOPICCODE, EFF_DATE, CREATER, STATE, STATE_DATE, REMARK)\n")
+                .append("SELECT XMLID, DBNAME, DATANAME, DATACNNAME, 'TAB', TEAM_CODE, CYCLETYPE, TOPICCODE, EFF_DATE, CREATER, STATE, STATE_DATE, REMARK FROM MDS.TABLEFILE WHERE DATANAME IN (SELECT TABLE_NAME FROM MD.IMP_TABLE_LIST);\n");
+
         return sqlBuffer.toString();
 
     }
 
-    private String makeImportDataSql(List<Table> tables, String[] tableColNames, String[] tableFieldsColNames,StringBuilder mainBuffer) {
+    private String makeImportDataSql(String dbUser,List<Table> tables, String[] tableColNames, 
+            String[] tableFieldsColNames, StringBuilder mainBuffer) {
         StringBuilder sqlbuffer = new StringBuilder();
         Map hqlmap = new HashMap();
         int count = 0, numFile = 0;
@@ -152,7 +171,7 @@ public class MetaDataExportMain {
             for (Table table : tables) {
                 count++;
                 sqlbuffer.append("\n");
-                String insertsql1 = "insert into tablefile (" + tablecolnam + ") values ("
+                String insertsql1 = "insert into "+dbUser+".tablefile (" + tablecolnam + ") values ("
                         + "'" + table.getTableId() + "',"
                         + "'" + table.getDbServName() + "',"
                         + "'" + table.getTableName() + "',"
@@ -178,7 +197,7 @@ public class MetaDataExportMain {
                         }
                         String isIsPrimaryKey = tablecol.isIsPrimaryKey() ? "1" : "";
                         String isIsNullable = tablecol.isIsNullable() ? "Y" : "N";
-                        String insertsql2 = "insert into column_val (" + fieldcolnam + ") values ("
+                        String insertsql2 = "insert into "+dbUser+".column_val (" + fieldcolnam + ") values ("
                                 + "'" + tablecol.getTableId() + "',"
                                 + "'" + tablecol.getColumnId() + "',"
                                 + "'" + tablecol.getTableName() + "',"
@@ -273,7 +292,7 @@ public class MetaDataExportMain {
         }
     }
 
-    private List<Table> exportTablesForDacp(List<String> tableList, Map<String, Table> metaDataMap, String[] branches) {
+    public List<Table> exportTablesForDacp(List<String> tableList, Map<String, Table> metaDataMap, String[] branches) {
         List<Table> childtables = new ArrayList();//地市共享模型集合
         List<Table> maintables = new ArrayList();//主模型集合
         LocalDate today = LocalDate.now();

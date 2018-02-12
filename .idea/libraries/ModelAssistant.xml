@@ -1,0 +1,10 @@
+<component name="libraryTable">
+  <library name="ModelAssistant">
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/db2_tables.zip!/" />
+      <root url="jar://$PROJECT_DIR$/hive_tables.zip!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>

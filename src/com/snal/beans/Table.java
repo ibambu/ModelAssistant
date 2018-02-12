@@ -59,15 +59,15 @@ public class Table implements Cloneable {
     private List<TableCol> tablecols;//模型字段集
 
     public TableCol getTableCol(String colName) {
-        if (tablecols == null || tablecols.isEmpty()) {
-            return null;
-        }
-        for (TableCol tablecol : tablecols) {
-            if (tablecol.getColumnName().equalsIgnoreCase(colName)) {
-                return tablecol;
+        TableCol retCol = null;
+        if (tablecols != null && !tablecols.isEmpty()) {
+            for (TableCol tablecol : tablecols) {
+                if (tablecol.getColumnName().equalsIgnoreCase(colName)) {
+                    retCol = tablecol;
+                }
             }
         }
-        return null;
+        return retCol;
     }
 
     public int getLineId() {
@@ -431,7 +431,7 @@ public class Table implements Cloneable {
                 keystr += col.getColumnName() + ",";
             }
         }
-        if (keystr.trim().length()>0) {
+        if (keystr.trim().length() > 0) {
             keystr = keystr.substring(0, keystr.length() - 1);
         }
         return keystr;

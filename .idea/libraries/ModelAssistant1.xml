@@ -1,0 +1,9 @@
+<component name="libraryTable">
+  <library name="ModelAssistant1">
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/dist/ModelAssistant.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>
