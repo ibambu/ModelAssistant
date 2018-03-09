@@ -40,9 +40,7 @@ public class TableUtil {
         }
         if (table.isShared()) {
             for (String branch : branches) {
-                if (branch.equalsIgnoreCase("OTH")) {
-                    continue;
-                }
+               
                 Table branchTable = (Table) table.clone();
                 branchTable.setMainTable(false);
                 branchTable.setTableName(table.getTableName() + "_" + branch);

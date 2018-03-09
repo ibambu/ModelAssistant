@@ -32,4 +32,6 @@ public interface IModelUpgradeHiveService {
      * @return
      */
     public String modifyColumns(Table table, String[] columnPairs);
+    
+    public String createPKCheckRule(Table table);
 }

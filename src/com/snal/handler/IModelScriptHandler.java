@@ -9,7 +9,6 @@ import com.snal.beans.Require;
 import com.snal.beans.Table;
 import com.snal.beans.TableOP;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;

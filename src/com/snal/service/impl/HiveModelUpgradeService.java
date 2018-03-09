@@ -35,21 +35,57 @@ public class HiveModelUpgradeService implements IModelUpgradeHiveService {
 
     @Override
     public String addColumns(Table table, String[] newColumns) {
-        StringBuilder sqlbuffer = new StringBuilder();
-        String newcols = "";
-        List<TableCol> cols = table.getTablecols();
+        StringBuilder sqlbuffer = new StringBuilder("");
+        sqlbuffer.append("ALTER TABLE ").append(table.getDbName()).append(".")
+                .append(table.getTableName()).append(" ADD COLUMNS (");
         for (String newColumn : newColumns) {
             TableCol col = table.getTableCol(newColumn);
-            newcols += col.getColumnName() + " " + col.getDbType() + ",";
+            sqlbuffer.append(col.getColumnName()).append(" ").append(col.getDataType()).append(",");
+        }
+        sqlbuffer.deleteCharAt(sqlbuffer.length() - 1);
+        sqlbuffer.append(")");
+        if (table.isPartitionTable()) {
+            sqlbuffer.append(" CASCADE;\n");
         }
         return sqlbuffer.toString();
     }
 
     @Override
     public String modifyColumns(Table table, String[] columnPairs) {
-        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+        StringBuilder sqlbuffer = new StringBuilder("");
+        for (String columnPair : columnPairs) {
+            String[] columns = columnPair.split("-");
+            String oldname = columns[0];
+            String newname = columns[1];
+            TableCol newCol = table.getTableCol(newname);
+            sqlbuffer.append("ALTER TABLE ").append(table.getDbName()).append(".")
+                    .append(table.getTableName()).append(" ")
+                    .append(" CHANGE ").append(oldname).append(" ").append(newname).append(" ").append(newCol.getDataType());
+            if (table.isPartitionTable()) {
+                sqlbuffer.append(" CASCADE");
+            }
+            sqlbuffer.append(";\n");
+        }
+        return sqlbuffer.toString();
     }
 
+    @Override
+    public String createPKCheckRule(Table table) {
+        String rule = "";
+        if (table.getPrimaryKeys() != null && table.getPrimaryKeys().trim().length() > 0) {
+            rule = "\"" + table.getDbName() + "." + table.getTableName() + "\",\"PK_CHK\",1,\"PK\",\"" + table.getPrimaryKeys() + "\",\""
+                    + table.getPartitionColsStr() + "\",1.00," + table.getMonitorThreshold() + ",\"N\"";
+        }
+        return rule;
+    }
+
+    /**
+     * 生成字段建表语句
+     *
+     * @param table
+     * @param isUseProxy
+     * @return
+     */
     private String makeTableCreateScript(Table table, boolean isUseProxy) {
         StringBuilder sqlbuff = new StringBuilder();
         if (isUseProxy) {
@@ -140,4 +176,5 @@ public class HiveModelUpgradeService implements IModelUpgradeHiveService {
         }
         return strbuffer.toString();
     }
+
 }

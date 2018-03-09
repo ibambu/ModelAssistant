@@ -116,7 +116,7 @@ public class TableScriptCreator {
             }
         }
         scanner.close();
-        if (isValid) {
+        if (true) {
             Map<String, StringBuilder> hqlmap = new HashMap();//存放建表语句，租户相同的模型其建表语句放在一起，便于升级。
             /**
              * 根据function.option.value 调用不同的功能函数。

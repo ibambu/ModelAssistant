@@ -65,7 +65,7 @@ public class ModeScriptBuilder {
                     + table.getColDelimiter()
                     + "','serialization.encoding'='"
                     + table.getCharacterSet()
-                    + "','serialization.null.format'='');";
+                    + "','serialization.null.format'='NVL');";
             if (useProxy) {
                 modifyhql = "remote_cli.pl " + table.getTenantUser() + " beeline -e \"USE " + table.getDbName() + ";" + modifyhql + "\"";
             }

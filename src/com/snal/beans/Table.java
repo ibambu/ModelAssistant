@@ -58,6 +58,24 @@ public class Table implements Cloneable {
 
     private List<TableCol> tablecols;//模型字段集
 
+    /**
+     * 是否分区模型
+     *
+     * @return
+     */
+    public boolean isPartitionTable() {
+        boolean isPrtTable = false;
+        if (!isMainTable()) {
+            if (Arrays.asList(partitionCols).contains("day")
+                    || Arrays.asList(partitionCols).contains("month")) {
+                isPrtTable = true;//包含有时间分区字段的地市模型才是分区模型
+            }
+        } else {
+            isPrtTable = true;//主模型都是分区模型
+        }
+        return isPrtTable;
+    }
+
     public TableCol getTableCol(String colName) {
         TableCol retCol = null;
         if (tablecols != null && !tablecols.isEmpty()) {
